@@ -69,7 +69,7 @@ def main() -> None:
 
     objs.append(container(content, 0, 0, CONTENT_W, CONTENT_H, bg=BG))
 
-    # Keep the first-level App title in the shared Shell, exactly like Works.
+    # Keep the first-level App title in the shared Shell like other native Apps.
     # Game-specific status gets its own row below that 64 px header.
     objs.append(label(
         content, 18, 70, 216, 26, "SCORE 0", size=20, color=INK,

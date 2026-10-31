@@ -148,7 +148,6 @@ HUB_IMAGES = [
     (f'{ASSETS}/icons/controller.png', 118, 118),
     (f'{ASSETS}/icons/claw.png', 118, 118),
     (f'{ASSETS}/icons/settings.png', 118, 118),
-    (f'{ASSETS}/icons/skills.png', 118, 118),
     (f'{ASSETS}/icons/album.png', 118, 118),
     (f'{ASSETS}/icons/music.png', 118, 118),
     (f'{ASSETS}/icons/bricks.png', 118, 118),

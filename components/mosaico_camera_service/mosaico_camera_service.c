@@ -48,10 +48,12 @@ typedef struct {
     uint8_t buffer_count;
 } camera_profile_t;
 
-/* Keep high-resolution defaults lean; VGA retries with two buffers for stable capture. */
+/* The UI consumes a 480x480 preview, so prefer VGA to leave enough contiguous
+ * PSRAM for the DVP backup buffer and the UI's converted-frame buffers.  Keep
+ * the sensor default as a compatibility fallback for modules without VGA. */
 static const camera_profile_t s_camera_profiles[] = {
-    {0, 0, 1},
     {640, 480, 2},
+    {0, 0, 1},
 };
 
 static esp_err_t create_supported_camera(mosaico_module_mgr_slot_t slot,
@@ -82,19 +84,14 @@ static esp_err_t create_supported_camera(mosaico_module_mgr_slot_t slot,
             }
         }
 
-        const bool retry_vga = ret == ESP_OK && profile->width == 0 && camera_info.width == 640 && camera_info.height == 480;
-        if (ret == ESP_OK && !retry_vga) {
+        if (ret == ESP_OK) {
             ESP_LOGI(TAG, "Camera profile accepted: %ux%u buffers=%u", (unsigned)camera_info.width,
                      (unsigned)camera_info.height, (unsigned)camera_info.buffer_count);
             *out_camera = camera;
             return ESP_OK;
         }
-        if (retry_vga) {
-            ESP_LOGI(TAG, "VGA camera detected; retrying with double buffering");
-        } else {
-            last_err = ret;
-            ESP_LOGW(TAG, "Camera profile rejected: %s", esp_err_to_name(ret));
-        }
+        last_err = ret;
+        ESP_LOGW(TAG, "Camera profile rejected: %s", esp_err_to_name(ret));
         if (camera != NULL) {
             const esp_err_t del_ret = mosaico_camera_del(camera);
             if (del_ret != ESP_OK) {

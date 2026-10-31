@@ -10,7 +10,7 @@ OUT_H = HERE / "mosaic_app_shell_titles.h"
 OUT_C = HERE / "mosaic_app_shell_titles.c"
 ASSETS = (
     *((title, 30) for title in
-      ("Camera", "我的作品", "SETTINGS", "IMU", "Env", "TOF", "Works",
+      ("Camera", "我的作品", "SETTINGS", "IMU", "Env", "TOF",
        "Breakout")),
     ("Battery Low", 20),
     ("Please charge your device", 18),

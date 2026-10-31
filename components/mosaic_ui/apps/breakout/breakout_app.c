@@ -318,7 +318,7 @@ const mosaic_app_descriptor_t mosaic_breakout_app = {
     .directory = &gsp_obj_directory_breakout,
     .disable_swipe = true,
     /* Shared Shell owns the same first-level header and exit affordance as
-     * Works; the scene starts its game HUD below that header. */
+     * other native Apps; the scene starts its game HUD below that header. */
     .root_header_in_stack = false,
     .on_started = breakout_started,
     .on_event = breakout_event,
