@@ -13,6 +13,7 @@
 #include "gsp_analog_clock.h"
 #include "mosaic_ui.h"
 #include "mosaic_settings.h"
+#include "holo_partner_runtime.h"
 #include "esp_log.h"
 
 #include <stdio.h>
@@ -1014,6 +1015,11 @@ void mosaic_hub_set_charging(bool charging)
 
 bool mosaic_hub_handle_action(uint16_t action_id)
 {
+    if (action_id == GSP_ACT_ID_HOME_HOLO_PROBE) {
+        (void)holo_partner_runtime_probe_camera(
+            s_hub_ui, GSP_BIND_HOLO_PROBE_STATUS);
+        return true;
+    }
     if (action_id == GSP_ACT_ID_INSERT_OPEN) {
         uint16_t page = 0;
         if (s_hub_ui != NULL &&
@@ -1217,6 +1223,7 @@ static void mosaic_hub_clock_tick(esp_gsp_handle_t ui, void *user_ctx)
 static void mosaic_hub_battery_tick(esp_gsp_handle_t ui, void *user_ctx)
 {
     (void)user_ctx;
+    holo_partner_runtime_poll(ui, GSP_BIND_HOLO_PROBE_STATUS);
     mosaic_hub_insert_request_t insert_request = {0};
     if (mosaic_hub_take_insert_request(&insert_request)) {
         const bool show_notice =
@@ -1374,6 +1381,7 @@ static void mosaic_hub_started(esp_gsp_handle_t ui)
     s_lock_was_charging = false;
     s_battery_pending = false;
     s_wifi_pending = false;
+    holo_partner_runtime_start(ui, GSP_BIND_HOLO_PROBE_STATUS);
 #if defined(ESP_PLATFORM)
     s_weather_pending = false;
     (void)esp_gsp_set_visible(ui, GSP_BIND_AOD_MODE_SWITCH_VISIBLE, false);
@@ -1424,6 +1432,7 @@ static void mosaic_hub_started(esp_gsp_handle_t ui)
 
 static void mosaic_hub_stopping(esp_gsp_handle_t ui)
 {
+    holo_partner_runtime_stop();
     mosaic_hub_stop_timers(ui);
     if (s_battery_subscribed) {
         (void)mosaic_settings_unsubscribe_battery(

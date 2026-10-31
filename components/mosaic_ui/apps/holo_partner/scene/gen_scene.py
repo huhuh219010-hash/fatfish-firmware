@@ -38,7 +38,9 @@ def main() -> None:
     page = len(objs)
     objs.append(layer(content, 0, 0, CONTENT_W, CONTENT_H,
                       name="holo_partner_root"))
-    append_holo_partner_content(objs, page, bold_font=BOLD, show_back=True)
+    append_holo_partner_content(
+        objs, page, bold_font=BOLD, show_back=True,
+        probe_callback="holo_probe")
 
     write_scene(scene_out_path(HERE, "holo_partner_480.json"),
                 "holo_partner", objs, font=FONT)

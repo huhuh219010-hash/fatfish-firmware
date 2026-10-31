@@ -12,6 +12,8 @@ dependencies:
     path: ../cap_im_ai_create
   mosaico_camera_service:
     path: ../mosaico_camera_service
+  fatfish_runtime:
+    path: ../fatfish_runtime
 
   mosaico_module_interact:
     git: https://github.com/esp-mosaico/esp-mosaico-bsp.git

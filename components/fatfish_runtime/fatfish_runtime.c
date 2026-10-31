@@ -6,6 +6,8 @@
 
 #include "fatfish_runtime.h"
 
+#include <string.h>
+
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -15,10 +17,17 @@
 
 static const char *TAG = "fatfish_runtime";
 
+#define FATFISH_RUNTIME_MAX_SUBSCRIBERS 4U
+
 typedef struct {
     bool stop;
     fatfish_runtime_command_t command;
 } fatfish_runtime_message_t;
+
+typedef struct {
+    fatfish_runtime_event_callback_t callback;
+    void *user_ctx;
+} fatfish_runtime_subscriber_t;
 
 typedef struct {
     SemaphoreHandle_t lock;
@@ -27,6 +36,7 @@ typedef struct {
     TaskHandle_t worker;
     fatfish_runtime_event_callback_t event_callback;
     void *user_ctx;
+    fatfish_runtime_subscriber_t subscribers[FATFISH_RUNTIME_MAX_SUBSCRIBERS];
     bool initialized;
     bool accepting_commands;
 } fatfish_runtime_state_t;
@@ -47,8 +57,27 @@ static bool command_type_valid(fatfish_runtime_command_type_t type)
 
 static void emit_event(const fatfish_runtime_event_t *event)
 {
-    if (s_runtime.event_callback) {
-        s_runtime.event_callback(event, s_runtime.user_ctx);
+    fatfish_runtime_event_callback_t primary_callback = NULL;
+    void *primary_ctx = NULL;
+    fatfish_runtime_subscriber_t subscribers[FATFISH_RUNTIME_MAX_SUBSCRIBERS] = {0};
+
+    if (s_runtime.lock) {
+        xSemaphoreTake(s_runtime.lock, portMAX_DELAY);
+        primary_callback = s_runtime.event_callback;
+        primary_ctx = s_runtime.user_ctx;
+        for (size_t i = 0; i < FATFISH_RUNTIME_MAX_SUBSCRIBERS; ++i) {
+            subscribers[i] = s_runtime.subscribers[i];
+        }
+        xSemaphoreGive(s_runtime.lock);
+    }
+
+    if (primary_callback) {
+        primary_callback(event, primary_ctx);
+    }
+    for (size_t i = 0; i < FATFISH_RUNTIME_MAX_SUBSCRIBERS; ++i) {
+        if (subscribers[i].callback) {
+            subscribers[i].callback(event, subscribers[i].user_ctx);
+        }
     }
 }
 
@@ -174,6 +203,7 @@ esp_err_t fatfish_runtime_init(const fatfish_runtime_config_t *config)
 
     s_runtime.event_callback = resolved.event_callback;
     s_runtime.user_ctx = resolved.user_ctx;
+    memset(s_runtime.subscribers, 0, sizeof(s_runtime.subscribers));
     s_runtime.accepting_commands = true;
     s_runtime.initialized = true;
     BaseType_t created = xTaskCreate(runtime_worker, "fatfish_runtime",
@@ -233,6 +263,7 @@ esp_err_t fatfish_runtime_deinit(void)
     s_runtime.worker = NULL;
     s_runtime.event_callback = NULL;
     s_runtime.user_ctx = NULL;
+    memset(s_runtime.subscribers, 0, sizeof(s_runtime.subscribers));
     s_runtime.initialized = false;
     xSemaphoreGive(s_runtime.lock);
     return ESP_OK;
@@ -270,6 +301,59 @@ esp_err_t fatfish_runtime_submit_camera_probe(uint32_t request_id,
         .type = FATFISH_RUNTIME_COMMAND_CAMERA_PROBE,
         .request_id = request_id,
     }, timeout_ms);
+}
+
+esp_err_t fatfish_runtime_subscribe(
+    fatfish_runtime_event_callback_t event_callback, void *user_ctx)
+{
+    if (!event_callback || !s_runtime.lock) {
+        return event_callback ? ESP_ERR_INVALID_STATE : ESP_ERR_INVALID_ARG;
+    }
+
+    xSemaphoreTake(s_runtime.lock, portMAX_DELAY);
+    if (!s_runtime.initialized || !s_runtime.accepting_commands) {
+        xSemaphoreGive(s_runtime.lock);
+        return ESP_ERR_INVALID_STATE;
+    }
+    for (size_t i = 0; i < FATFISH_RUNTIME_MAX_SUBSCRIBERS; ++i) {
+        if (s_runtime.subscribers[i].callback == event_callback &&
+            s_runtime.subscribers[i].user_ctx == user_ctx) {
+            xSemaphoreGive(s_runtime.lock);
+            return ESP_OK;
+        }
+    }
+    for (size_t i = 0; i < FATFISH_RUNTIME_MAX_SUBSCRIBERS; ++i) {
+        if (!s_runtime.subscribers[i].callback) {
+            s_runtime.subscribers[i] = (fatfish_runtime_subscriber_t) {
+                .callback = event_callback,
+                .user_ctx = user_ctx,
+            };
+            xSemaphoreGive(s_runtime.lock);
+            return ESP_OK;
+        }
+    }
+    xSemaphoreGive(s_runtime.lock);
+    return ESP_ERR_NO_MEM;
+}
+
+esp_err_t fatfish_runtime_unsubscribe(
+    fatfish_runtime_event_callback_t event_callback, void *user_ctx)
+{
+    if (!event_callback || !s_runtime.lock) {
+        return event_callback ? ESP_ERR_INVALID_STATE : ESP_ERR_INVALID_ARG;
+    }
+
+    xSemaphoreTake(s_runtime.lock, portMAX_DELAY);
+    for (size_t i = 0; i < FATFISH_RUNTIME_MAX_SUBSCRIBERS; ++i) {
+        if (s_runtime.subscribers[i].callback == event_callback &&
+            s_runtime.subscribers[i].user_ctx == user_ctx) {
+            s_runtime.subscribers[i] = (fatfish_runtime_subscriber_t) {0};
+            xSemaphoreGive(s_runtime.lock);
+            return ESP_OK;
+        }
+    }
+    xSemaphoreGive(s_runtime.lock);
+    return ESP_ERR_NOT_FOUND;
 }
 
 bool fatfish_runtime_is_initialized(void)

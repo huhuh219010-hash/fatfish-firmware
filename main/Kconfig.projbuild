@@ -3,15 +3,13 @@ menu "App Config"
     config APP_CLAW_MOSAIC_GSP_ENABLE
         bool "esp-gsp Mosaic UI"
         depends on ESP_BOARD_DEV_DISPLAY_LCD_SUPPORT
-        depends on APP_CLAW_CAP_CORE
-        depends on APP_CLAW_CAP_SKILL_MGR
-        depends on APP_CLAW_CAP_IM_WECHAT
         select MOSAIC_UI_ENABLE
         default n
         help
             Enable the product-owned esp-gsp Mosaic UI instead of ESP-Claw's
-            generic LVGL system UI. Board defaults must disable
-            APP_CLAW_SYSTEM_UI_ENABLE when this option is selected.
+            generic LVGL system UI. The product UI is independent of the
+            legacy Agent, skill-manager, and IM capability stack. Board
+            defaults must disable APP_CLAW_SYSTEM_UI_ENABLE when selected.
 
 menu "Default Wi-Fi Settings"
 

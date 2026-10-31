@@ -22,6 +22,7 @@ USB_SERIAL_JTAG_PID = 0x1001
 ROM_DOWNLOAD_PID = 0x0020
 SUPPORTED_PIDS = {USB_SERIAL_JTAG_PID, ROM_DOWNLOAD_PID}
 BOOT_COMMAND = b"\x1bMOSAICO_BOOT\n"
+BOOT_TOUCH_BAUD = 1200
 DEFAULT_PARTITIONS = ("app", "ui_apps")
 
 
@@ -69,9 +70,42 @@ def request_rom_boot(port) -> None:
     try:
         device.write(BOOT_COMMAND)
         device.flush()
+        # Also issue the CDC 1200-baud touch supported by current firmware.
+        # Sending both requests is intentional: the text command works around
+        # hosts that do not reliably deliver line-coding changes, while the
+        # baud touch still works if another console reader consumed the text.
+        try:
+            device.baudrate = BOOT_TOUCH_BAUD
+        except (OSError, serial.SerialException):
+            # A successful BOOT command may disconnect USB before pyserial can
+            # apply the fallback line coding.
+            pass
+        time.sleep(0.1)
+
+        # Finally emulate the USB-Serial/JTAG modem-control reset sequence.
+        # The firmware latches download mode at (RTS=0, DTR=1) and performs
+        # the reset when the lines reach (RTS=1, DTR=0).
+        try:
+            device.rts = False
+            device.dtr = False
+            time.sleep(0.1)
+            device.dtr = True
+            time.sleep(0.1)
+            device.rts = True
+            time.sleep(0.1)
+            device.dtr = False
+            time.sleep(0.1)
+            device.rts = False
+        except (OSError, serial.SerialException):
+            # One of the earlier triggers may already be re-enumerating USB.
+            pass
         time.sleep(0.25)
     finally:
-        device.close()
+        try:
+            device.close()
+        except (OSError, serial.SerialException):
+            # Disconnecting here means the device is already rebooting.
+            pass
 
 
 def wait_for_rom_port(app_device: str, timeout: float):
@@ -91,8 +125,9 @@ def wait_for_rom_port(app_device: str, timeout: float):
             return candidates[0]
         time.sleep(0.1)
     raise RuntimeError(
-        "ROM download port did not appear. This firmware predates the serial "
-        "BOOT command; enter BOOT manually once and rerun with its port."
+        "ROM download port did not appear after the serial BOOT command, "
+        "1200-baud trigger, and DTR/RTS reset; enter BOOT manually once and "
+        "rerun with its port."
     )
 
 

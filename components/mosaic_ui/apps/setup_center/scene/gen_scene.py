@@ -222,25 +222,21 @@ def build_overview(objs, parent):
     topbar(objs, parent, back="setup_center_close", title="AI SETUP")
     objs.append(label(parent, 24, 68, 432, 58, "AI Setup", size=44))
     objs.append(label(parent, 24, 126, 432, 30,
-                      "Network, WeChat and LLM", size=20, color=MUTED))
+                      "Network and LLM", size=20, color=MUTED))
     status_card(objs, parent, 172, "Network", "Not configured",
                 "setup_network", "setup_overview_network")
-    status_card(objs, parent, 272, "WeChat", "Not linked",
-                "setup_wechat", "setup_overview_wechat")
-    status_card(objs, parent, 372, "LLM", "Not configured",
+    status_card(objs, parent, 272, "LLM", "Not configured",
                 "setup_llm", "setup_overview_llm")
 
 
 def build_integrations(objs, parent):
-    topbar(objs, parent, back="setup_center_close", title="AI & INTEGRATIONS")
-    objs.append(label(parent, 24, 68, 432, 58, "AI & Integrations", size=44))
+    topbar(objs, parent, back="setup_center_close", title="AI MODEL")
+    objs.append(label(parent, 24, 68, 432, 58, "AI Model", size=44))
     objs.append(label(parent, 24, 126, 432, 30,
-                      "Model and message channel setup", size=20,
+                      "Model configuration", size=20,
                       color=MUTED))
     status_card(objs, parent, 172, "AI Model", "Not configured",
                 "setup_integrations_llm", "setup_overview_llm")
-    status_card(objs, parent, 272, "IM Channels", "Not linked",
-                "setup_integrations_wechat", "setup_overview_wechat")
 
 
 def build_network(objs, parent):

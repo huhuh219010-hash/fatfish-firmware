@@ -92,6 +92,14 @@ esp_err_t fatfish_runtime_submit(const fatfish_runtime_command_t *command,
 esp_err_t fatfish_runtime_submit_camera_probe(uint32_t request_id,
                                               uint32_t timeout_ms);
 
+/** @brief Subscribe to runtime events without replacing the primary callback. */
+esp_err_t fatfish_runtime_subscribe(
+    fatfish_runtime_event_callback_t event_callback, void *user_ctx);
+
+/** @brief Remove a previously registered runtime event subscription. */
+esp_err_t fatfish_runtime_unsubscribe(
+    fatfish_runtime_event_callback_t event_callback, void *user_ctx);
+
 bool fatfish_runtime_is_initialized(void);
 
 #ifdef __cplusplus

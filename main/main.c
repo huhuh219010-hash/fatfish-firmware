@@ -30,7 +30,6 @@
 #include "mosaic_imu_platform.h"
 #endif
 #include "network_provisioning_service.h"
-#include "wechat_binding_service.h"
 #include "audio_hub.h"
 #endif
 #include "time.h"
@@ -50,9 +49,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#if CONFIG_APP_CLAW_CAP_IM_WECHAT
-#include "cap_im_wechat.h"
-#endif
 #include "app_config.h"
 #include "claw_endpoint.h"
 #include "region_service.h"
@@ -82,25 +78,8 @@ static EXT_RAM_BSS_ATTR app_settings_service_handle_t s_app_settings;
 static region_service_handle_t s_region_service;
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
 static EXT_RAM_BSS_ATTR network_provisioning_service_handle_t s_network_provisioning;
-static EXT_RAM_BSS_ATTR wechat_binding_service_handle_t s_wechat_binding;
 static EXT_RAM_BSS_ATTR asr_service_handle_t s_asr_service;
 static SemaphoreHandle_t s_asr_config_lock;
-
-/* Keep the Setup Center model enum locked to the binding service contract. */
-#define ASSERT_WECHAT_STATE_MATCH(name)                                      \
-    _Static_assert((int)WECHAT_BINDING_STATE_##name ==                       \
-                       (int)MOSAIC_SETUP_WECHAT_##name,                      \
-                   "Setup Center WeChat state mismatch: " #name)
-ASSERT_WECHAT_STATE_MATCH(IDLE);
-ASSERT_WECHAT_STATE_MATCH(WAITING_SCAN);
-ASSERT_WECHAT_STATE_MATCH(SCANNED);
-ASSERT_WECHAT_STATE_MATCH(SAVING);
-ASSERT_WECHAT_STATE_MATCH(AWAITING_SAVE);
-ASSERT_WECHAT_STATE_MATCH(COMPLETE);
-ASSERT_WECHAT_STATE_MATCH(CANCELLED);
-ASSERT_WECHAT_STATE_MATCH(EXPIRED);
-ASSERT_WECHAT_STATE_MATCH(ERROR);
-#undef ASSERT_WECHAT_STATE_MATCH
 
 _Static_assert((int)REGION_SERVICE_AREA_UNKNOWN == (int)MOSAIC_SETUP_REGION_UNKNOWN &&
                (int)REGION_SERVICE_AREA_MAINLAND == (int)MOSAIC_SETUP_REGION_MAINLAND &&
@@ -301,45 +280,6 @@ static void on_network_provisioning_changed(
     //          status->ap_ssid[0] ? status->ap_ssid : "(none)");
 
     mosaic_settings_platform_notify_network_changed();
-}
-
-static void on_device_setup_wechat(
-    wechat_binding_service_handle_t service,
-    const wechat_binding_status_t *status,
-    void *user_ctx)
-{
-    (void)service;
-    (void)user_ctx;
-    mosaic_setup_wechat_status_t *model = calloc(1, sizeof(*model));
-    if (model == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate Setup Center WeChat model");
-        return;
-    }
-    model->active = status->active;
-    model->configured = status->configured;
-    model->persisted = status->persisted;
-    model->state = (mosaic_setup_wechat_state_t)status->state;
-    strlcpy(model->message, status->message, sizeof(model->message));
-    strlcpy(model->qr_payload, status->qr_payload,
-            sizeof(model->qr_payload));
-    strlcpy(model->account_id, status->account_id,
-            sizeof(model->account_id));
-    (void)mosaic_setup_set_wechat_status(model);
-    free(model);
-}
-
-static esp_err_t device_setup_start_wechat(
-    void *user_ctx, const char *account_id, bool force)
-{
-    (void)user_ctx;
-    return wechat_binding_service_start(s_wechat_binding, account_id, force,
-        WECHAT_BINDING_PERSIST_AUTOMATIC);
-}
-
-static esp_err_t device_setup_cancel_wechat(void *user_ctx)
-{
-    (void)user_ctx;
-    return wechat_binding_service_cancel(s_wechat_binding);
 }
 
 static void on_region_changed(region_service_handle_t service,
@@ -553,148 +493,6 @@ static esp_err_t main_restart_device(void)
     ESP_RETURN_ON_FALSE(ok == pdPASS, ESP_ERR_NO_MEM, TAG, "Failed to create restart task");
     return ESP_OK;
 }
-
-#if CONFIG_APP_CLAW_CAP_IM_WECHAT
-#if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
-static esp_err_t main_wechat_binding_persist(
-    const wechat_binding_credentials_t *credentials,
-    void *user_ctx)
-{
-    (void)user_ctx;
-    ESP_RETURN_ON_FALSE(credentials != NULL &&
-                        credentials->token[0] != '\0',
-                        ESP_ERR_INVALID_ARG, TAG,
-                        "WeChat credentials are invalid");
-
-    app_config_t *config = calloc(1, sizeof(*config));
-    ESP_RETURN_ON_FALSE(config != NULL, ESP_ERR_NO_MEM, TAG,
-                        "Failed to allocate WeChat config");
-    esp_err_t err = app_config_load(config);
-    if (err == ESP_OK) {
-        strlcpy(config->wechat_token,
-                credentials->token,
-                sizeof(config->wechat_token));
-        strlcpy(config->wechat_base_url,
-                credentials->base_url,
-                sizeof(config->wechat_base_url));
-        strlcpy(config->wechat_account_id,
-                credentials->account_id,
-                sizeof(config->wechat_account_id));
-        err = main_save_config(config);
-    }
-    free(config);
-    return err;
-}
-
-static esp_err_t main_wechat_login_start(
-    const char *account_id, bool force)
-{
-    ESP_RETURN_ON_FALSE(s_wechat_binding != NULL,
-                        ESP_ERR_INVALID_STATE, TAG,
-                        "WeChat binding service is not ready");
-    return wechat_binding_service_start(
-               s_wechat_binding, account_id, force,
-               WECHAT_BINDING_PERSIST_MANUAL);
-}
-
-static esp_err_t main_wechat_login_get_status(
-    http_server_wechat_login_status_t *status)
-{
-    ESP_RETURN_ON_FALSE(status != NULL, ESP_ERR_INVALID_ARG, TAG,
-                        "status is NULL");
-    ESP_RETURN_ON_FALSE(s_wechat_binding != NULL,
-                        ESP_ERR_INVALID_STATE, TAG,
-                        "WeChat binding service is not ready");
-
-    wechat_binding_session_t *session =
-        calloc(1, sizeof(*session));
-    ESP_RETURN_ON_FALSE(session != NULL, ESP_ERR_NO_MEM, TAG,
-                        "Failed to allocate login status");
-    esp_err_t err = wechat_binding_service_get_session(
-                        s_wechat_binding, session);
-    if (err == ESP_OK) {
-        memset(status, 0, sizeof(*status));
-        status->active = session->active;
-        status->configured = session->configured;
-        status->completed = session->completed;
-        status->persisted = session->persisted;
-        strlcpy(status->session_key, session->session_key,
-                sizeof(status->session_key));
-        strlcpy(status->status, session->status,
-                sizeof(status->status));
-        strlcpy(status->message, session->message,
-                sizeof(status->message));
-        strlcpy(status->qr_data_url, session->qr_data_url,
-                sizeof(status->qr_data_url));
-        strlcpy(status->account_id, session->account_id,
-                sizeof(status->account_id));
-        strlcpy(status->user_id, session->user_id,
-                sizeof(status->user_id));
-        strlcpy(status->token, session->token,
-                sizeof(status->token));
-        strlcpy(status->base_url, session->base_url,
-                sizeof(status->base_url));
-    }
-    free(session);
-    return err;
-}
-
-static esp_err_t main_wechat_login_cancel(void)
-{
-    ESP_RETURN_ON_FALSE(s_wechat_binding != NULL,
-                        ESP_ERR_INVALID_STATE, TAG,
-                        "WeChat binding service is not ready");
-    return wechat_binding_service_cancel(s_wechat_binding);
-}
-#else
-static esp_err_t main_wechat_login_start(const char *account_id, bool force)
-{
-    return cap_im_wechat_qr_login_start(account_id, force);
-}
-
-static esp_err_t main_wechat_login_get_status(http_server_wechat_login_status_t *status)
-{
-    esp_err_t ret = ESP_OK;
-    cap_im_wechat_qr_login_status_t *raw = NULL;
-
-    ESP_RETURN_ON_FALSE(status, ESP_ERR_INVALID_ARG, TAG, "status is NULL");
-
-    raw = calloc(1, sizeof(*raw));
-    ESP_RETURN_ON_FALSE(raw, ESP_ERR_NO_MEM, TAG, "Failed to allocate login status");
-
-    ESP_GOTO_ON_ERROR(cap_im_wechat_qr_login_get_status(raw), cleanup, TAG,
-                      "Failed to query WeChat login status");
-
-    memset(status, 0, sizeof(*status));
-    status->active = raw->active;
-    status->configured = raw->configured;
-    status->completed = raw->completed;
-    status->persisted = raw->persisted;
-    strlcpy(status->session_key, raw->session_key, sizeof(status->session_key));
-    strlcpy(status->status, raw->status, sizeof(status->status));
-    strlcpy(status->message, raw->message, sizeof(status->message));
-    strlcpy(status->qr_data_url, raw->qr_data_url, sizeof(status->qr_data_url));
-    strlcpy(status->account_id, raw->account_id, sizeof(status->account_id));
-    strlcpy(status->user_id, raw->user_id, sizeof(status->user_id));
-    strlcpy(status->token, raw->token, sizeof(status->token));
-    strlcpy(status->base_url, raw->base_url, sizeof(status->base_url));
-
-cleanup:
-    free(raw);
-    return ret;
-}
-
-static esp_err_t main_wechat_login_cancel(void)
-{
-    return cap_im_wechat_qr_login_cancel();
-}
-
-static esp_err_t main_wechat_login_mark_persisted(void)
-{
-    return cap_im_wechat_qr_login_mark_persisted();
-}
-#endif
-#endif
 
 static esp_err_t init_nvs(void)
 {
@@ -1015,28 +813,6 @@ void app_main(void)
             s_network_provisioning,
             on_network_provisioning_changed,
             NULL));
-        ESP_ERROR_CHECK(wechat_binding_service_create(
-            &(wechat_binding_service_config_t) {
-                .persist = main_wechat_binding_persist,
-                .initially_configured =
-                    s_config->wechat_token[0] != '\0' &&
-                    s_config->wechat_base_url[0] != '\0',
-                .initial_account_id = s_config->wechat_account_id,
-            },
-            &s_wechat_binding));
-        ESP_ERROR_CHECK(mosaic_setup_configure_wechat(
-            &(mosaic_setup_wechat_ops_t) {
-                .start = device_setup_start_wechat,
-                .cancel = device_setup_cancel_wechat,
-            }));
-        ESP_ERROR_CHECK(wechat_binding_service_register_cb(
-            s_wechat_binding,
-            on_device_setup_wechat,
-            NULL));
-        wechat_binding_status_t setup_wechat = {0};
-        ESP_ERROR_CHECK(wechat_binding_service_get_status(
-            s_wechat_binding, &setup_wechat));
-        on_device_setup_wechat(s_wechat_binding, &setup_wechat, NULL);
     }
     ESP_ERROR_CHECK(mosaic_setup_configure_region(
         &(mosaic_setup_region_ops_t) {
@@ -1109,14 +885,6 @@ void app_main(void)
             .save_config = main_save_web_config,
             .get_wifi_status = main_get_wifi_status,
             .restart_device = main_restart_device,
-#if CONFIG_APP_CLAW_CAP_IM_WECHAT
-            .wechat_login_start = main_wechat_login_start,
-            .wechat_login_get_status = main_wechat_login_get_status,
-            .wechat_login_cancel = main_wechat_login_cancel,
-#if !CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
-            .wechat_login_mark_persisted = main_wechat_login_mark_persisted,
-#endif
-#endif
         },
     }));
 #if !CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE

@@ -792,9 +792,6 @@ static void setup_overview_render(void)
     } else if (s_setup.network_skipped) {
         network = "Skipped · Not configured";
     }
-    const char *wechat = s_setup.wechat_configured
-        ? "Mosaico-Lab · Linked"
-        : (s_setup.wechat_skipped ? "Skipped · Not linked" : "Not linked");
     const char *llm = s_setup.llm_configured
         ? (s_setup.settings_snapshot.llm.model[0]
             ? s_setup.settings_snapshot.llm.model : "Configured")
@@ -802,11 +799,7 @@ static void setup_overview_render(void)
                                : "Not configured");
     (void)gsp_setup_center_setup_network_summary_set_text(
         s_setup.ui, network);
-    (void)gsp_setup_center_setup_wechat_summary_set_text(
-        s_setup.ui, wechat);
     (void)gsp_setup_center_setup_llm_summary_set_text(s_setup.ui, llm);
-    (void)gsp_setup_center_setup_integrations_wechat_summary_set_text(
-        s_setup.ui, wechat);
     (void)gsp_setup_center_setup_integrations_llm_summary_set_text(
         s_setup.ui, llm);
 }
@@ -1600,15 +1593,10 @@ static void setup_region_render(int64_t now_us)
     s_setup.rendered_region_second = (uint8_t)elapsed_s;
 }
 
-/* WeChat binding is offered during onboarding only in mainland China. */
 static void setup_advance_after_region(int64_t now_us, mosaic_setup_region_t region)
 {
-    if (region == MOSAIC_SETUP_REGION_MAINLAND) {
-        setup_open_wechat(now_us, SETUP_WECHAT_ENTRY_ONBOARDING);
-    } else {
-        s_setup.wechat_skipped = !s_setup.wechat_configured;
-        setup_finish_onboarding(now_us);
-    }
+    (void)region;
+    setup_open_llm(now_us);
 }
 
 static void setup_open_region(int64_t now_us)
@@ -1709,11 +1697,6 @@ static void setup_handle_call(const mosaic_event_t *event)
     case GSP_ACT_ID_SETUP_OVERVIEW_NETWORK:
         if (s_setup.page == s_setup.overview_page) {
             setup_open_network(now_us);
-        }
-        break;
-    case GSP_ACT_ID_SETUP_OVERVIEW_WECHAT:
-        if (s_setup.page == s_setup.overview_page) {
-            setup_open_wechat(now_us, SETUP_WECHAT_ENTRY_APP);
         }
         break;
     case GSP_ACT_ID_SETUP_OVERVIEW_LLM:
@@ -1896,7 +1879,7 @@ static void setup_handle_call(const mosaic_event_t *event)
         } else {
             setup_overview_render();
             (void)setup_pop(s_setup.mode == MOSAIC_SETUP_MODE_ONBOARDING
-                ? SETUP_PAGE_WECHAT : s_setup.overview_page, now_us);
+                ? SETUP_PAGE_REGION : s_setup.overview_page, now_us);
         }
         break;
     case GSP_ACT_ID_SETUP_REGION_MAINLAND:
@@ -2134,10 +2117,7 @@ static void setup_start(esp_gsp_handle_t ui, int64_t now_us)
         setup_open_network(now_us);
         break;
     case MOSAIC_SETUP_ROUTE_WECHAT:
-        setup_open_wechat(now_us,
-            s_setup.mode == MOSAIC_SETUP_MODE_ONBOARDING
-                ? SETUP_WECHAT_ENTRY_ONBOARDING
-                : SETUP_WECHAT_ENTRY_APP);
+        setup_open_llm(now_us);
         break;
     case MOSAIC_SETUP_ROUTE_LLM:
         setup_open_llm(now_us);

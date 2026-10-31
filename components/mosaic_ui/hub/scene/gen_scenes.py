@@ -791,7 +791,8 @@ def build_hub_objects():
                       hidden=True, name='legacy_home_runtime'))
     build_clock_face(objs, legacy_home)
     append_holo_partner_content(
-        objs, home_main, bold_font=BOLD, show_back=False)
+        objs, home_main, bold_font=BOLD, show_back=False,
+        probe_callback='home_holo_probe')
 
     # tab1: Apps1 — icon grid only (no bottom dots / Home chrome).
     apps1_main = len(objs)

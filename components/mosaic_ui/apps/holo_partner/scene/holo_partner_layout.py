@@ -5,7 +5,8 @@
 from scene_common import CONTENT_H, CONTENT_W, button, container, label
 
 
-def append_holo_partner_content(objs, parent, *, bold_font, show_back):
+def append_holo_partner_content(objs, parent, *, bold_font, show_back,
+                                probe_callback):
     """Append the asset-free HoloPartner surface to ``parent``."""
     # An opaque surface lets Hub retain its existing Home objects underneath
     # during the first integration milestone.  Their runtime bindings continue
@@ -35,9 +36,21 @@ def append_holo_partner_content(objs, parent, *, bold_font, show_back):
     objs.append(label(parent, 0, 344, CONTENT_W, 48, "HoloPartner",
                       size=36, color="#FCFCFF", align="center",
                       font=bold_font))
-    objs.append(label(parent, 0, 394, CONTENT_W, 30,
-                      "Hello from your device", size=18,
-                      color="#9AB6C4", align="center"))
+    objs.append(label(
+        parent, 0, 394, CONTENT_W, 30,
+        "Tap the face to check camera", size=18,
+        color="#9AB6C4", align="center",
+        name="holo_probe_status", bind="holo_probe_status",
+        font_charset=(
+            " .:0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+        ),
+    ))
+
+    # Transparent hit target sits above the face artwork without changing it.
+    objs.append(button(parent, 120, 90, 240, 240, "",
+                       bg="#000000", radius=120, opacity=0,
+                       name="holo_probe", callback=probe_callback))
 
     if show_back:
         objs.append(button(parent, 18, 18, 88, 44, "Back", bg="#181819",
