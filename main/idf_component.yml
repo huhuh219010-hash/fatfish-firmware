@@ -84,6 +84,9 @@ dependencies:
   mosaico_camera_service:
     path: ../components/mosaico_camera_service
 
+  fatfish_runtime:
+    path: ../components/fatfish_runtime
+
   settings:
     path: ../third-party/esp-claw/components/common/settings
 

@@ -139,14 +139,12 @@ HUB_IMAGES = [
     (f'{ASSETS}/home_bg.png', 480, 480),
     (f'{ASSETS}/icons/up_chevron.png', 32, 32),
     (f'{ASSETS}/control_center/capsule_mask_72.png', 72, 152),
-    (f'{ASSETS}/icons/status_logo.png', 40, 40),
     (f'{ASSETS}/icons/status_wifi.png', 40, 40),
     *[(f'{ASSETS}/icons/status_wifi_{level}.png', 40, 40)
       for level in range(0, 5)],
     (f'{ASSETS}/icons/camera.png', 118, 118),
     (f'{ASSETS}/icons/imu.png', 118, 118),
     (f'{ASSETS}/icons/controller.png', 118, 118),
-    (f'{ASSETS}/icons/claw.png', 118, 118),
     (f'{ASSETS}/icons/settings.png', 118, 118),
     (f'{ASSETS}/icons/album.png', 118, 118),
     (f'{ASSETS}/icons/music.png', 118, 118),
@@ -812,8 +810,6 @@ def build_hub_objects():
          'callback': 'app_interact'},
         {'name': 'app_camera', 'icon': 'camera', 'text': 'Camera',
          'callback': 'app_camera'},
-        {'name': 'app_ai_create', 'icon': 'claw', 'text': 'CLAW',
-         'callback': 'app_ai_create'},
     ))
 
     # Fixed chrome is authored after PageFlow content so it remains topmost.

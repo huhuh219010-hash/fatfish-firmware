@@ -251,7 +251,7 @@ def _build_root(objs, page):
         "x": 0, "y": 64, "w": 480, "h": 400,
         "name": "settings_root_list",
         "item_height": 100,
-        "item_count": 9,
+        "item_count": 7,
         "row_template": "settings_root_row",
         "scroll_snapshot": True,
         "snap_to_item": False,
@@ -282,12 +282,12 @@ def _build_root(objs, page):
         "image": ROOT_DYNAMIC_PLACEHOLDER, "fit": "cover",
         "dynamic_image": True, "name": "settings_root_row_icon",
     })
-    title = label(row, 68, 27, 190, 46, "AI Model", size=30,
+    title = label(row, 68, 27, 190, 46, "Network", size=30,
                   name="settings_root_row_title")
     title["overflow"] = "ellipsis"
     title["font_charset"] = SETTINGS_RUNTIME_CHARSET
     objs.append(title)
-    value = label(row, 260, 33, 152, 34, "Trial", size=20,
+    value = label(row, 260, 33, 152, 34, "Off", size=20,
                   color=MUTED, align="right",
                   name="settings_root_row_value")
     value["overflow"] = "ellipsis"
@@ -463,7 +463,7 @@ def _build_wlan(objs, page):
                       hidden=True, name="settings_wlan_off_layer",
                       bind="settings_wlan_off_visible"))
     objs.append(label(off_layer, 12, 6, 456, 80,
-                      "claw, Feature1, Feature require WLAN",
+                      "Online features require WLAN",
                       size=20, color=MUTED))
 
     list_layer = len(objs)

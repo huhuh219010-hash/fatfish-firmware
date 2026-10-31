@@ -37,6 +37,7 @@
 #include "nvs_flash.h"
 #include "http_server.h"
 #include "mosaico_camera_service.h"
+#include "fatfish_runtime.h"
 #include "esp_attr.h"
 #include "esp_log.h"
 #include "esp_err.h"
@@ -877,6 +878,60 @@ static esp_err_t main_install_touch_mux(void)
     return ESP_OK;
 }
 
+static void main_fatfish_runtime_event(
+    const fatfish_runtime_event_t *event, void *user_ctx)
+{
+    (void)user_ctx;
+    if (!event) {
+        return;
+    }
+
+    switch (event->type) {
+    case FATFISH_RUNTIME_EVENT_READY:
+        ESP_LOGI(TAG, "Fatfish runtime ready");
+        break;
+    case FATFISH_RUNTIME_EVENT_COMMAND_STARTED:
+        ESP_LOGI(TAG, "Fatfish command started: type=%d request=%lu",
+                 (int)event->command_type,
+                 (unsigned long)event->request_id);
+        break;
+    case FATFISH_RUNTIME_EVENT_CAMERA_PROBED:
+        if (event->status == ESP_OK) {
+            ESP_LOGI(TAG,
+                     "Fatfish camera probe: available=1 size=%lux%lu "
+                     "format=0x%08lx buffers=%u",
+                     (unsigned long)event->data.camera.width,
+                     (unsigned long)event->data.camera.height,
+                     (unsigned long)event->data.camera.pixel_format,
+                     (unsigned)event->data.camera.buffer_count);
+        } else {
+            ESP_LOGW(TAG, "Fatfish camera probe: available=0 status=%s",
+                     esp_err_to_name(event->status));
+        }
+        break;
+    case FATFISH_RUNTIME_EVENT_COMMAND_FAILED:
+        ESP_LOGW(TAG, "Fatfish command failed: type=%d request=%lu status=%s",
+                 (int)event->command_type,
+                 (unsigned long)event->request_id,
+                 esp_err_to_name(event->status));
+        break;
+    case FATFISH_RUNTIME_EVENT_STOPPED:
+        ESP_LOGI(TAG, "Fatfish runtime stopped");
+        break;
+    default:
+        break;
+    }
+}
+
+static esp_err_t main_start_fatfish_runtime(void)
+{
+    fatfish_runtime_config_t config = FATFISH_RUNTIME_DEFAULT_CONFIG();
+    config.event_callback = main_fatfish_runtime_event;
+    ESP_RETURN_ON_ERROR(fatfish_runtime_init(&config), TAG,
+                        "start Fatfish runtime failed");
+    return fatfish_runtime_submit_camera_probe(1, 0);
+}
+
 void app_main(void)
 {
 #if defined(ESP_MOSAICO_REMOTE_DEBUG) && APP_ENABLE_CLAW_TASKS
@@ -921,6 +976,7 @@ void app_main(void)
     ESP_ERROR_CHECK(main_install_touch_mux());
 #if !CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     ESP_ERROR_CHECK(mosaico_camera_service_init());
+    ESP_ERROR_CHECK(main_start_fatfish_runtime());
 #endif
     ESP_ERROR_CHECK(app_fs_init());
 
@@ -1021,6 +1077,7 @@ void app_main(void)
                  "bindings, audio/ASR, capabilities, and agent not started");
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
         ESP_ERROR_CHECK(mosaico_camera_service_init());
+        ESP_ERROR_CHECK(main_start_fatfish_runtime());
         esp_err_t battery_monitor_err =
             mosaic_settings_platform_start_battery_monitor();
         if (battery_monitor_err != ESP_OK) {
@@ -1149,6 +1206,7 @@ void app_main(void)
     ESP_ERROR_CHECK(app_claw_set_network_ready_callback(main_network_ready, NULL));
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     ESP_ERROR_CHECK(mosaico_camera_service_init());
+    ESP_ERROR_CHECK(main_start_fatfish_runtime());
     esp_err_t battery_monitor_err = mosaic_settings_platform_start_battery_monitor();
     if (battery_monitor_err != ESP_OK) {
         ESP_LOGW(TAG, "battery monitor unavailable: %s", esp_err_to_name(battery_monitor_err));

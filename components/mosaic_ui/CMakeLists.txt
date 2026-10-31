@@ -33,7 +33,6 @@ idf_component_register(
          "common/ai_create_voice_session.c"
          "common/mosaic_ai_create_runtime.c"
          "common/qrcodegen/qrcodegen.c"
-         "apps/ai_create/ai_create_presenter.c"
          ${MOSAIC_APP_MODULE_SOURCES}
     INCLUDE_DIRS "."
                  "include"

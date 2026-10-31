@@ -78,7 +78,6 @@ static int32_t s_quick_tap_y0;
 static int32_t s_quick_level;
 static bool s_quick_wlan = true;
 static bool s_quick_vibration = true;
-static bool s_agent_configured;
 static mosaic_ui_haptic_cb_t s_haptic_callback;
 static void *s_haptic_user_ctx;
 static mosaic_settings_battery_t s_battery_info;
@@ -437,20 +436,6 @@ static void mosaic_hub_quick_render(esp_gsp_handle_t ui)
         s_quick_vibration, UINT32_C(0xFA60));
 }
 
-static bool mosaic_hub_agent_is_configured(
-    const mosaic_settings_snapshot_t *snapshot)
-{
-    if (snapshot == NULL) {
-        return false;
-    }
-    const bool llm_configured =
-        mosaic_settings_llm_is_configured(snapshot);
-    const bool im_configured = snapshot->im.wechat_configured ||
-        snapshot->im.qq_configured || snapshot->im.feishu_configured ||
-        snapshot->im.telegram_configured;
-    return llm_configured && im_configured;
-}
-
 static void mosaic_hub_system_status_apply(
     esp_gsp_handle_t ui, const mosaic_settings_snapshot_t *snapshot)
 {
@@ -458,7 +443,6 @@ static void mosaic_hub_system_status_apply(
         return;
     }
     s_quick_vibration = snapshot->vibration_enabled;
-    s_agent_configured = mosaic_hub_agent_is_configured(snapshot);
     /* Non-persistent slider updates apply immediately to hardware, while the
      * settings snapshot intentionally keeps the last persisted value until
      * release. Do not let the periodic status refresh pull an active drag
@@ -473,10 +457,6 @@ static void mosaic_hub_system_status_apply(
             ui, GSP_OBJ_KEY_QUICK_VOLUME_FILL,
             GSP_OBJ_KEY_QUICK_VOLUME_INPUT, snapshot->volume);
     }
-    (void)esp_gsp_set_visible(
-        ui, GSP_BIND_STATUS_AGENT, s_agent_configured);
-    (void)esp_gsp_set_visible(
-        ui, GSP_BIND_QUICK_STATUS_AGENT, s_agent_configured);
     mosaic_hub_quick_toggle_render(
         ui, GSP_OBJ_KEY_QUICK_VIBRATION,
         GSP_OBJ_KEY_QUICK_VIBRATION_OFF,

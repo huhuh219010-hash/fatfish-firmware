@@ -672,14 +672,6 @@ def status_bar(objs, parent, assets_prefix, *, time_name="status_time",
     # packed at a 7 px gap and the battery remains 24 px from the right edge.
     # The PNGs stay on 40x40 canvases for GSP, so their slot origins account
     # for each asset's transparent inset.
-    logo = len(objs)
-    objs.append(layer(
-        parent, 357, y, 40, 40,
-        name=f"{bind_prefix}_agent", bind=f"{bind_prefix}_agent",
-        hidden=True,
-    ))
-    objs.append(image(logo, f"{assets_prefix}/icons/status_logo.png",
-                      0, 0, 40, 40))
     # Hub shows one of status_wifi_0..4 (0 = on/no-link, 1..4 = RSSI).
     wifi = len(objs)
     objs.append(layer(

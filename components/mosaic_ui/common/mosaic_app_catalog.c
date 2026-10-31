@@ -77,7 +77,7 @@ bool mosaic_app_catalog_validate(void)
 {
     static const char *const required_apps[] = {
         "welcome",
-        "ai_create", "camera", "settings", "setup_center",
+        "camera", "settings", "setup_center",
     };
     size_t root_count = 0;
     if (mosaic_app_registry_count != mosaic_app_package_count) {

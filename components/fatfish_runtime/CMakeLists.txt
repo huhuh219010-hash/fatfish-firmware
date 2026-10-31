@@ -1,0 +1,11 @@
+idf_component_register(
+    SRCS
+        "fatfish_runtime.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        mosaico_camera_service
+    PRIV_REQUIRES
+        freertos
+        log
+)

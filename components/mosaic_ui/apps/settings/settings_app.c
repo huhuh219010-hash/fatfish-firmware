@@ -971,8 +971,6 @@ typedef struct {
 }
 
 static const settings_root_row_t s_root_rows[] = {
-    SETTINGS_ROOT_ROW("AI Model", ai),
-    SETTINGS_ROOT_ROW("IM Channels", channels),
     SETTINGS_ROOT_ROW("Network", network),
     SETTINGS_ROOT_ROW("Display", display),
     SETTINGS_ROOT_ROW("Sound", sound),
@@ -1009,19 +1007,6 @@ static const char *settings_wlan_summary(void)
     return "Offline";
 }
 
-static bool settings_llm_is_bound(void)
-{
-    return mosaic_settings_llm_is_configured(&s_state.snapshot);
-}
-
-static bool settings_any_im_is_bound(void)
-{
-    return s_state.snapshot.im.wechat_configured ||
-           s_state.snapshot.im.qq_configured ||
-           s_state.snapshot.im.feishu_configured ||
-           s_state.snapshot.im.telegram_configured;
-}
-
 static gsp_err_t settings_root_list_bind_item(
     esp_gsp_handle_t ui, esp_gsp_row_t row, uint32_t item_index,
     void *user_ctx)
@@ -1034,23 +1019,17 @@ static gsp_err_t settings_root_list_bind_item(
     const char *value_text = value;
     switch (item_index) {
     case 0:
-        value_text = settings_llm_is_bound() ? "Bound" : "Unbound";
-        break;
-    case 1:
-        value_text = settings_any_im_is_bound() ? "Bound" : "Unbound";
-        break;
-    case 2:
         value_text = settings_wlan_summary();
         break;
-    case 3:
+    case 1:
         (void)snprintf(value, sizeof(value), "%" PRId32 "%%",
                        s_state.brightness);
         break;
-    case 4:
+    case 2:
         (void)snprintf(value, sizeof(value), "%" PRId32 "%%",
                        s_state.volume);
         break;
-    case 6:
+    case 4:
         if (s_state.snapshot.battery.available) {
             (void)snprintf(value, sizeof(value), "%u%%",
                            s_state.snapshot.battery.state_of_charge);
@@ -2531,29 +2510,6 @@ static void settings_integrations_pop(esp_gsp_handle_t ui)
     s_state.integration_page = 0;
 }
 
-static void settings_open_integration(esp_gsp_handle_t ui, bool llm)
-{
-    const uint16_t page = llm
-        ? SETTINGS_INTEGRATIONS_MODEL_PAGE
-        : SETTINGS_INTEGRATIONS_CHANNELS_PAGE;
-    if (esp_gsp_stack_view_push(ui, GSP_OBJ_KEY_SETTINGS_STACK,
-            page, true) != ESP_GSP_OK) {
-        (void)mosaic_top_notice_show(
-            ui, &s_top_notice, "AI & Integrations",
-            "Unable to open page", SETTINGS_NOTICE_DURATION_MS);
-        return;
-    }
-    mosaic_app_shell_set_root_visible(ui, false);
-    s_state.integration_page = page;
-    if (llm) {
-        s_state.rendered_llm_qr[0] = '\0';
-        settings_llm_refresh(ui);
-    } else {
-        s_state.rendered_channel_qr[0] = '\0';
-        settings_channels_refresh(ui);
-    }
-}
-
 static void settings_dispatch_call(
     esp_gsp_handle_t ui, const mosaic_event_t *event)
 {
@@ -2563,11 +2519,7 @@ static void settings_dispatch_call(
         if (item >= sizeof(s_root_rows) / sizeof(s_root_rows[0])) {
             return;
         }
-        if (item <= 1U) {
-            settings_open_integration(ui, item == 0U);
-            return;
-        }
-        if (item == 2U) {
+        if (item == 0U) {
             if (s_state.wlan_page_active) {
                 return;
             }
@@ -2597,21 +2549,21 @@ static void settings_dispatch_call(
             settings_wlan_list_attach(ui);
             return;
         }
-        if (item == 6U) {
+        if (item == 4U) {
             settings_refresh_snapshot(ui);
             settings_open_detail(ui, SETTINGS_DETAIL_BATTERY);
             return;
         }
-        if (item == 8U) {
+        if (item == 6U) {
             settings_refresh_snapshot(ui);
             settings_open_detail(ui, SETTINGS_DETAIL_ABOUT);
             return;
         }
         static const uint16_t pages[] = {
-            [3] = SETTINGS_DISPLAY_PAGE,
-            [4] = SETTINGS_SOUND_PAGE,
-            [5] = SETTINGS_SECURITY_PAGE,
-            [7] = SETTINGS_DEBUG_PAGE,
+            [1] = SETTINGS_DISPLAY_PAGE,
+            [2] = SETTINGS_SOUND_PAGE,
+            [3] = SETTINGS_SECURITY_PAGE,
+            [5] = SETTINGS_DEBUG_PAGE,
         };
         const uint16_t page = pages[item];
         if (page == 0U || esp_gsp_stack_view_push(
@@ -2619,7 +2571,7 @@ static void settings_dispatch_call(
             return;
         }
         mosaic_app_shell_set_root_visible(ui, false);
-        if (item == 3U || item == 4U) {
+        if (item == 1U || item == 2U) {
             s_state.display_page_active = true;
             s_state.display_reset_pending = false;
             settings_display_request_render();
