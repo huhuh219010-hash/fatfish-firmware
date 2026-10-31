@@ -21,6 +21,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent / 'common'))
+sys.path.insert(0, str(
+    HERE.parent.parent / 'apps' / 'holo_partner' / 'scene'))
 
 from font_paths import DEJAVU_SANS, DEJAVU_SANS_BOLD  # noqa: E402
 from scene_common import (  # noqa: E402
@@ -41,6 +43,7 @@ from scene_common import (  # noqa: E402
     explicit_charset,
     shared_charset,
 )
+from holo_partner_layout import append_holo_partner_content  # noqa: E402
 
 
 def _clock_hand(parent, name, size, color, sweep, angle):
@@ -806,6 +809,8 @@ def build_hub_objects():
     objs.append(layer(flow, 0, 0, CONTENT_W, CONTENT_H,
                       name='launcher_flow_tab0'))
     build_clock_face(objs, home_main)
+    append_holo_partner_content(
+        objs, home_main, bold_font=BOLD, show_back=False)
 
     # tab1: Apps1 — icon grid only (no bottom dots / Home chrome).
     apps1_main = len(objs)
