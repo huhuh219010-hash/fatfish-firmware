@@ -97,7 +97,7 @@ def build_scene(module_dir: Path, gspc: Path, output_dir: Path,
                 resources = sorted(out.glob("*.grb"))
                 if not resources:
                     raise RuntimeError("GSPC did not generate interact resources")
-            elif module not in {"ai_create", "breakout"}:
+            elif module != "ai_create":
                 resource_stem = f"{stem}_assets" if module in ASSET_SCENES - {"bluetooth"} else stem
                 resource = out / f"{resource_stem}.grb"
                 if module in {"hub", "camera", "weather"} or resource.is_file():

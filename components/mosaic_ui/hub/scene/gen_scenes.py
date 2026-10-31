@@ -150,7 +150,6 @@ HUB_IMAGES = [
     (f'{ASSETS}/icons/settings.png', 118, 118),
     (f'{ASSETS}/icons/album.png', 118, 118),
     (f'{ASSETS}/icons/music.png', 118, 118),
-    (f'{ASSETS}/icons/bricks.png', 118, 118),
     (f'{ASSETS}/icons/weather.png', 118, 118),
     *[(f'{ASSETS}/control_center/{name}.png', width, height)
       for name, width, height in (
@@ -374,8 +373,6 @@ def build_apps1_content(objs, parent):
          'callback': 'app_album'},
         {'name': 'app_music', 'icon': 'music', 'text': 'Music',
          'callback': 'app_music'},
-        {'name': 'app_breakout', 'icon': 'bricks', 'text': 'Bricks',
-         'callback': 'app_breakout'},
         {'name': 'app_weather', 'icon': 'weather', 'text': 'Weather',
          'callback': 'app_weather'},
     ))
