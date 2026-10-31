@@ -18,6 +18,21 @@ ESP-Mosaico is an **ESP32-S31** development board. The hardware revision is stor
 
 There is no onboard camera or SD card. A camera module can be connected through the left expansion slot.
 
+## Automatic firmware download
+
+The running firmware exposes a custom USB CDC port. Entering the ROM
+bootloader disconnects that port and creates a second serial device, so a
+single direct `esptool` invocation cannot follow the transition on every host.
+Use the project helper to request download mode, wait for the ROM port, and
+flash the application and UI partitions:
+
+```bash
+python tools/mosaico_flash.py
+```
+
+Firmware versions built before the serial download command was added must be
+placed in BOOT mode manually once. Subsequent updates can use the helper.
+
 ## Main Buses and GPIOs
 
 All I2C addresses below are 7-bit addresses.

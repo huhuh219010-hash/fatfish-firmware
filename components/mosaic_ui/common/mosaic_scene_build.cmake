@@ -139,12 +139,16 @@ function(mosaic_setup_bundle_generation_for_target
     set(linked_bundles)
 
     foreach(manifest IN LISTS app_manifests)
+        unset(MOSAIC_APP_ENABLED)
         unset(MOSAIC_APP_NAME)
         unset(MOSAIC_APP_BUNDLE)
         unset(MOSAIC_APP_GENERATOR)
         unset(MOSAIC_APP_GENERATED_HEADERS)
         unset(MOSAIC_APP_SCENE_SOURCES)
         include("${manifest}")
+        if(DEFINED MOSAIC_APP_ENABLED AND NOT MOSAIC_APP_ENABLED)
+            continue()
+        endif()
         if(NOT DEFINED MOSAIC_APP_NAME OR NOT DEFINED MOSAIC_APP_BUNDLE
                 OR NOT DEFINED MOSAIC_APP_GENERATOR)
             message(FATAL_ERROR

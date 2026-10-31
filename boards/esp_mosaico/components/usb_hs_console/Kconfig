@@ -8,7 +8,9 @@ menu "USB HS Console Config"
         default n
         help
             Enable USB-Serial/JTAG-compatible DTR/RTS reset handling for the
-            custom USB CDC console.
+            custom USB CDC console. A dedicated serial control command and a
+            1200-baud touch can also request ROM download mode, allowing a host
+            tool to reconnect after the App port is re-enumerated.
 
     config USB_HS_CONSOLE_USB_CDC_AUTO_INIT
         bool "Automatically initialize custom USB CDC console"

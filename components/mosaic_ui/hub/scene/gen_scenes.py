@@ -280,7 +280,7 @@ def build_clock_face(objs, parent):
     # Dynamic text binds skip label hit regions; use a weather-only target.
     objs.append(container(
         parent, weather_x, card_y + 33, 205, 167, bg='#242425',
-        name='home_weather_target', callback='app_weather',
+        name='home_weather_target',
     ))
     objs.append(label(
         parent, weather_x, card_y + 33, 205, 98, '--',
@@ -307,25 +307,6 @@ def build_clock_face(objs, parent):
     # valid and firmware can update each hand through its stable name.
     orb_x, orb_y = card_x + 262, card_y + 20
     append_home_clock(objs, parent, orb_x, orb_y)  # demo 12:24
-
-    # Web H1 order: Camera / CLAW / Works.
-    shortcuts = (
-        (ICON_COLS[0], 'camera', 'Camera', 'app_camera'),
-        (ICON_COLS[1], 'claw', 'CLAW', 'app_ai_create'),
-        (ICON_COLS[2], 'skills', 'Works', 'app_works'),
-    )
-    for x, icon, text, cb in shortcuts:
-        objs.append(image(
-            parent, f'{ASSETS}/icons/{icon}.png',
-            x, ICON_ROW_BOT_Y, ICON_SIZE, ICON_SIZE,
-            name=f'clock_shortcut_{icon}', callback=cb,
-        ))
-        objs.append(label(
-            parent, x, ICON_ROW_BOT_Y + ICON_SIZE + ICON_LABEL_GAP,
-            ICON_SIZE, ICON_LABEL_H, text, size=16,
-            color='#D6D6DE', align='center', callback=cb,
-        ))
-
 
 def stack_pop_btn(objs, parent, *, x=12, y=14, w=72, h=44, text='Back'):
     objs.append(button(
@@ -808,7 +789,13 @@ def build_hub_objects():
     home_main = len(objs)
     objs.append(layer(flow, 0, 0, CONTENT_W, CONTENT_H,
                       name='launcher_flow_tab0'))
-    build_clock_face(objs, home_main)
+    # Retain only the legacy Home objects needed by generated runtime bindings.
+    # The subtree is hidden and contains no callbacks, so it cannot launch an
+    # App through the visible HoloPartner surface.
+    legacy_home = len(objs)
+    objs.append(layer(home_main, 0, 0, CONTENT_W, CONTENT_H,
+                      hidden=True, name='legacy_home_runtime'))
+    build_clock_face(objs, legacy_home)
     append_holo_partner_content(
         objs, home_main, bold_font=BOLD, show_back=False)
 
@@ -827,6 +814,10 @@ def build_hub_objects():
          'bg': '#123F50'},
         {'name': 'app_interact', 'icon': 'controller', 'text': 'Interaction',
          'callback': 'app_interact'},
+        {'name': 'app_camera', 'icon': 'camera', 'text': 'Camera',
+         'callback': 'app_camera'},
+        {'name': 'app_ai_create', 'icon': 'claw', 'text': 'CLAW',
+         'callback': 'app_ai_create'},
     ))
 
     # Fixed chrome is authored after PageFlow content so it remains topmost.

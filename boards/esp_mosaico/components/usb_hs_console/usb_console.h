@@ -22,7 +22,8 @@ extern "C" {
  * CDC-ACM interface 0. Repeated calls are harmless.
  *
  * CONFIG_USB_HS_CONSOLE_USB_CDC_AUTO_DOWNLOAD independently enables the
- * USB-Serial/JTAG-compatible DTR/RTS reset behavior for firmware download.
+ * USB-Serial/JTAG-compatible DTR/RTS plus explicit serial-command reset
+ * behavior for firmware download.
  */
 esp_err_t bsp_usb_console_init(void);
 

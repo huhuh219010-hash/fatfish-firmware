@@ -17,6 +17,8 @@ extern void __real_app_main(void);
 #include "esp_log_write.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "soc/lp_system_reg.h"
 #include "soc/soc.h"
 #include "tinyusb.h"
@@ -94,6 +96,12 @@ static esp_err_t log_mirror_init(void)
  */
 #define BSP_USB_SERIAL_JTAG_PID 0x1001
 #define BSP_USB_RESTART_DELAY_US (50 * 1000)
+#define BSP_USB_BOOT_TOUCH_BAUD 1200U
+#define BSP_USB_BOOT_TASK_STACK 2048U
+#define BSP_USB_BOOT_TASK_PRIORITY 4U
+#define BSP_USB_BOOT_POLL_MS 20U
+
+static const uint8_t s_boot_command[] = "\x1bMOSAICO_BOOT\n";
 
 static const tusb_desc_device_t s_usb_device_descriptor = {
     .bLength = sizeof(s_usb_device_descriptor),
@@ -121,6 +129,8 @@ typedef enum {
 static atomic_int s_reboot_mode = ATOMIC_VAR_INIT(BSP_USB_REBOOT_NONE);
 static atomic_bool s_download_mode = ATOMIC_VAR_INIT(false);
 static esp_timer_handle_t s_restart_timer;
+static size_t s_boot_command_offset;
+static TaskHandle_t s_boot_command_task;
 
 static void usb_console_before_restart(void)
 {
@@ -135,7 +145,41 @@ static void usb_console_before_restart(void)
 static void restart_timer_callback(void *arg)
 {
     (void)arg;
+    /* Apply the boot mode before the generic shutdown chain starts.  The
+     * shutdown handler repeats this as a fallback for other restart paths. */
+    usb_console_before_restart();
     esp_restart();
+}
+
+static void request_reboot(bsp_usb_reboot_t requested_mode)
+{
+    int current_mode = atomic_load_explicit(&s_reboot_mode, memory_order_acquire);
+    for (;;) {
+        /* An explicit download request is allowed to upgrade a pending normal
+         * reset.  Opening a CDC port can change DTR/RTS before its first data
+         * packet arrives, so first-request-wins would discard the BOOT command. */
+        if (current_mode == BSP_USB_REBOOT_BOOTLOADER ||
+                (current_mode != BSP_USB_REBOOT_NONE &&
+                 requested_mode != BSP_USB_REBOOT_BOOTLOADER)) {
+            return;
+        }
+        if (atomic_compare_exchange_weak_explicit(&s_reboot_mode, &current_mode, requested_mode,
+                                                   memory_order_acq_rel, memory_order_acquire)) {
+            break;
+        }
+    }
+
+    /* A pending normal reset already owns the timer; only its mode changed. */
+    if (current_mode != BSP_USB_REBOOT_NONE) {
+        return;
+    }
+    if (esp_timer_start_once(s_restart_timer, BSP_USB_RESTART_DELAY_US) != ESP_OK) {
+        int failed_mode = requested_mode;
+        (void)atomic_compare_exchange_strong_explicit(&s_reboot_mode, &failed_mode,
+                                                       BSP_USB_REBOOT_NONE,
+                                                       memory_order_acq_rel,
+                                                       memory_order_acquire);
+    }
 }
 
 static void cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
@@ -173,16 +217,79 @@ static void cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
     const bsp_usb_reboot_t requested_mode =
         atomic_load_explicit(&s_download_mode, memory_order_acquire) ?
         BSP_USB_REBOOT_BOOTLOADER : BSP_USB_REBOOT_NORMAL;
-    int expected_mode = BSP_USB_REBOOT_NONE;
-    if (!atomic_compare_exchange_strong_explicit(&s_reboot_mode, &expected_mode, requested_mode,
-                                                  memory_order_acq_rel, memory_order_acquire)) {
+    request_reboot(requested_mode);
+}
+
+static void cdc_line_coding_changed_callback(int itf, cdcacm_event_t *event)
+{
+    (void)itf;
+    const cdc_line_coding_t *coding = event->line_coding_changed_data.p_line_coding;
+    if (coding == NULL || coding->bit_rate != BSP_USB_BOOT_TOUCH_BAUD) {
         return;
     }
+    /* A 1200-baud touch is independent of DTR/RTS behavior and works with
+     * custom TinyUSB CDC devices on macOS, Linux, and Windows. */
+    request_reboot(BSP_USB_REBOOT_BOOTLOADER);
+}
 
-    /* Delay restart long enough for SET_CONTROL_LINE_STATE to complete. */
-    if (esp_timer_start_once(s_restart_timer, BSP_USB_RESTART_DELAY_US) != ESP_OK) {
-        atomic_store_explicit(&s_reboot_mode, BSP_USB_REBOOT_NONE, memory_order_release);
+static bool consume_boot_command(const uint8_t *buffer, size_t received)
+{
+    for (size_t index = 0; index < received; ++index) {
+        const uint8_t value = buffer[index];
+        if (value == s_boot_command[s_boot_command_offset]) {
+            ++s_boot_command_offset;
+            if (s_boot_command_offset == sizeof(s_boot_command) - 1U) {
+                s_boot_command_offset = 0;
+                return true;
+            }
+        } else {
+            s_boot_command_offset = value == s_boot_command[0] ? 1U : 0U;
+        }
     }
+    return false;
+}
+
+static void boot_command_task(void *arg)
+{
+    (void)arg;
+    uint8_t buffer[64];
+    while (true) {
+        size_t received = 0;
+        do {
+            if (tinyusb_cdcacm_read(TINYUSB_CDC_ACM_0, buffer, sizeof(buffer),
+                                    &received) != ESP_OK) {
+                received = 0;
+                break;
+            }
+            if (consume_boot_command(buffer, received)) {
+                ESP_LOGI(TAG, "Serial BOOT command received");
+                request_reboot(BSP_USB_REBOOT_BOOTLOADER);
+                break;
+            }
+        } while (received == sizeof(buffer));
+        (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(BSP_USB_BOOT_POLL_MS));
+    }
+}
+
+static void cdc_rx_callback(int itf, cdcacm_event_t *event)
+{
+    (void)itf;
+    (void)event;
+    TaskHandle_t task = s_boot_command_task;
+    if (task != NULL) {
+        xTaskNotifyGive(task);
+    }
+}
+
+static esp_err_t boot_command_task_start(void)
+{
+    if (xTaskCreate(boot_command_task, "usb_boot", BSP_USB_BOOT_TASK_STACK,
+                    NULL, BSP_USB_BOOT_TASK_PRIORITY,
+                    &s_boot_command_task) != pdPASS) {
+        s_boot_command_task = NULL;
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
 }
 
 static esp_err_t auto_download_init(void)
@@ -206,6 +313,10 @@ static esp_err_t auto_download_init(void)
 
 static void auto_download_deinit(void)
 {
+    if (s_boot_command_task != NULL) {
+        vTaskDelete(s_boot_command_task);
+        s_boot_command_task = NULL;
+    }
     (void)esp_unregister_shutdown_handler(usb_console_before_restart);
     if (s_restart_timer) {
         (void)esp_timer_delete(s_restart_timer);
@@ -213,6 +324,7 @@ static void auto_download_deinit(void)
     }
     atomic_store_explicit(&s_reboot_mode, BSP_USB_REBOOT_NONE, memory_order_release);
     atomic_store_explicit(&s_download_mode, false, memory_order_release);
+    s_boot_command_offset = 0;
 }
 
 #endif /* CONFIG_USB_HS_CONSOLE_USB_CDC_AUTO_DOWNLOAD */
@@ -254,7 +366,9 @@ esp_err_t bsp_usb_console_init(void)
     const tinyusb_config_cdcacm_t cdc_config = {
         .cdc_port = TINYUSB_CDC_ACM_0,
 #if CONFIG_USB_HS_CONSOLE_USB_CDC_AUTO_DOWNLOAD
+        .callback_rx = cdc_rx_callback,
         .callback_line_state_changed = cdc_line_state_changed_callback,
+        .callback_line_coding_changed = cdc_line_coding_changed_callback,
 #endif
     };
     ret = tinyusb_cdcacm_init(&cdc_config);
@@ -290,6 +404,17 @@ esp_err_t bsp_usb_console_init(void)
         auto_download_deinit();
 #endif
         ESP_LOGE(TAG, "Failed to initialize UART log mirror: %s", esp_err_to_name(ret));
+        return ret;
+    }
+#endif
+
+#if CONFIG_USB_HS_CONSOLE_USB_CDC_AUTO_DOWNLOAD
+    ret = boot_command_task_start();
+    if (ret != ESP_OK) {
+        (void)tinyusb_console_deinit(TINYUSB_CDC_ACM_0);
+        (void)tinyusb_cdcacm_deinit(TINYUSB_CDC_ACM_0);
+        usb_console_driver_uninstall();
+        auto_download_deinit();
         return ret;
     }
 #endif

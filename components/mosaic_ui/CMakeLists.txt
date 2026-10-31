@@ -25,7 +25,6 @@ idf_component_register(
          "common/mosaic_app_shell.c"
          "common/mosaic_app_shell_titles.c"
          "common/mosaic_settings_model.c"
-         "common/works_runtime.c"
          "common/mosaic_top_notice.c"
          "common/wechat_binding_flow.c"
          "common/ai_create_controller.c"
@@ -75,6 +74,9 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
         ${COMPONENT_LIB})
 
     set(UI_ASSETS_DIR "${CMAKE_CURRENT_BINARY_DIR}/ui_apps")
+    foreach(disabled_bundle_name IN LISTS MOSAIC_DISABLED_APP_BUNDLE_NAMES)
+        file(REMOVE "${UI_ASSETS_DIR}/${disabled_bundle_name}.gspb")
+    endforeach()
     set(UI_ASSET_FILES ${MOSAIC_LINKED_BUNDLES})
     list(APPEND UI_ASSET_FILES "${MOSAIC_FONT_CATALOG}")
     set(UI_ASSET_NAMES ${MOSAIC_APP_BUNDLE_NAMES})
@@ -82,6 +84,7 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION)
 
     set(UI_STAGED_FILES)
     set(UI_STAGE_COMMANDS
+        COMMAND ${CMAKE_COMMAND} -E rm -rf "${UI_ASSETS_DIR}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${UI_ASSETS_DIR}")
     list(LENGTH UI_ASSET_FILES UI_ASSET_COUNT)
     math(EXPR UI_ASSET_LAST "${UI_ASSET_COUNT} - 1")
