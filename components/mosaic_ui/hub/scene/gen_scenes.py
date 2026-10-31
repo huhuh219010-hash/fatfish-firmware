@@ -817,6 +817,9 @@ def build_hub_objects():
     objs.append(layer(flow, CONTENT_W * 2, 0, CONTENT_W, CONTENT_H,
                       name='launcher_flow_tab2'))
     place_app_grid(objs, apps2_main, (
+        {'name': 'app_holo_partner', 'text': 'HoloPartner',
+         'callback': 'app_holo_partner', 'button_text': 'HP',
+         'bg': '#123F50'},
         {'name': 'app_interact', 'icon': 'controller', 'text': 'Interaction',
          'callback': 'app_interact'},
     ))
