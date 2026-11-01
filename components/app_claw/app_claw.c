@@ -846,9 +846,6 @@ esp_err_t app_claw_start(const app_claw_config_t *config, claw_hw_registry_handl
     ESP_RETURN_ON_ERROR(build_storage_paths(&paths), TAG, "Failed to resolve storage paths");
 
     ESP_RETURN_ON_FALSE(registry != NULL, ESP_ERR_INVALID_ARG, TAG, "hardware registry is required");
-#if CONFIG_APP_CLAW_CAP_LUA
-    ESP_RETURN_ON_ERROR(cap_lua_set_hw_registry(registry), TAG, "bind Lua hardware registry failed");
-#endif
     app_claw_audio_start_service();
 
 #if CONFIG_APP_CLAW_CAP_EVENT_ROUTER

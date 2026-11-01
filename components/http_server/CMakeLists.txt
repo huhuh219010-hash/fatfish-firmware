@@ -29,6 +29,7 @@ set(http_server_requires
     app_config
     app_system_config
     app_claw
+    fatfish_runtime
     esp_http_server
     heap
 )

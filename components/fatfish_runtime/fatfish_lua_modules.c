@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "app_lua_modules.h"
+#include "fatfish_lua_modules.h"
 
 #include <ctype.h>
 #include <stdbool.h>
@@ -123,23 +123,23 @@
 #include "lua_module_vision.h"
 #endif
 
-static const char *TAG = "app_lua_modules";
+static const char *TAG = "fatfish_lua_modules";
 
-#define APP_LUA_EXTERNAL_MODULE_INITIAL_CAPACITY 4
+#define FATFISH_LUA_EXTERNAL_MODULE_INITIAL_CAPACITY 4
 
 typedef struct {
     const char *module_id;
     const char *display_name;
-    app_lua_module_register_fn reg;
-} app_lua_module_entry_t;
+    fatfish_lua_module_register_fn reg;
+} fatfish_lua_module_entry_t;
 
-static app_lua_module_external_t *s_external_modules;
+static fatfish_lua_module_external_t *s_external_modules;
 static size_t s_external_module_count;
 static size_t s_external_module_capacity;
-static app_lua_module_info_t *s_module_infos;
+static fatfish_lua_module_info_t *s_module_infos;
 static size_t s_module_info_capacity;
 
-static bool app_lua_modules_config_empty(const char *value)
+static bool fatfish_lua_modules_config_empty(const char *value)
 {
     size_t i;
 
@@ -156,7 +156,7 @@ static bool app_lua_modules_config_empty(const char *value)
     return true;
 }
 
-static char *app_lua_trim_token(char *token)
+static char *fatfish_lua_trim_token(char *token)
 {
     char *end;
 
@@ -176,7 +176,7 @@ static char *app_lua_trim_token(char *token)
     return token;
 }
 
-static int app_lua_find_entry(const app_lua_module_entry_t *entries,
+static int fatfish_lua_find_entry(const fatfish_lua_module_entry_t *entries,
                               size_t count,
                               const char *module_id)
 {
@@ -195,7 +195,7 @@ static int app_lua_find_entry(const app_lua_module_entry_t *entries,
     return -1;
 }
 
-static int app_lua_find_external_module(const char *module_id)
+static int fatfish_lua_find_external_module(const char *module_id)
 {
     size_t i;
 
@@ -213,9 +213,9 @@ static int app_lua_find_external_module(const char *module_id)
     return -1;
 }
 
-static esp_err_t app_lua_reserve_external_modules(size_t required_count)
+static esp_err_t fatfish_lua_reserve_external_modules(size_t required_count)
 {
-    app_lua_module_external_t *new_modules = NULL;
+    fatfish_lua_module_external_t *new_modules = NULL;
     size_t new_capacity = s_external_module_capacity;
 
     if (required_count <= s_external_module_capacity) {
@@ -223,7 +223,7 @@ static esp_err_t app_lua_reserve_external_modules(size_t required_count)
     }
 
     if (new_capacity == 0) {
-        new_capacity = APP_LUA_EXTERNAL_MODULE_INITIAL_CAPACITY;
+        new_capacity = FATFISH_LUA_EXTERNAL_MODULE_INITIAL_CAPACITY;
     }
     while (new_capacity < required_count) {
         new_capacity *= 2;
@@ -239,9 +239,9 @@ static esp_err_t app_lua_reserve_external_modules(size_t required_count)
     return ESP_OK;
 }
 
-static esp_err_t app_lua_reserve_module_infos(size_t required_count)
+static esp_err_t fatfish_lua_reserve_module_infos(size_t required_count)
 {
-    app_lua_module_info_t *new_infos = NULL;
+    fatfish_lua_module_info_t *new_infos = NULL;
 
     if (required_count <= s_module_info_capacity) {
         return ESP_OK;
@@ -257,8 +257,8 @@ static esp_err_t app_lua_reserve_module_infos(size_t required_count)
     return ESP_OK;
 }
 
-static esp_err_t app_lua_build_module_map(const char *configured_modules,
-                                          const app_lua_module_entry_t *entries,
+static esp_err_t fatfish_lua_build_module_map(const char *configured_modules,
+                                          const fatfish_lua_module_entry_t *entries,
                                           size_t entry_count,
                                           bool *selected_map)
 {
@@ -273,7 +273,7 @@ static esp_err_t app_lua_build_module_map(const char *configured_modules,
 
     memset(selected_map, 0, entry_count * sizeof(selected_map[0]));
 
-    if (app_lua_modules_config_empty(configured_modules)) {
+    if (fatfish_lua_modules_config_empty(configured_modules)) {
         for (i = 0; i < entry_count; i++) {
             selected_map[i] = true;
         }
@@ -289,7 +289,7 @@ static esp_err_t app_lua_build_module_map(const char *configured_modules,
     for (token = strtok_r(modules_copy, ",", &saveptr);
             token;
             token = strtok_r(NULL, ",", &saveptr)) {
-        char *trimmed = app_lua_trim_token(token);
+        char *trimmed = fatfish_lua_trim_token(token);
         int index;
 
         if (!trimmed || !trimmed[0]) {
@@ -300,7 +300,7 @@ static esp_err_t app_lua_build_module_map(const char *configured_modules,
             continue;
         }
 
-        index = app_lua_find_entry(entries, entry_count, trimmed);
+        index = fatfish_lua_find_entry(entries, entry_count, trimmed);
         if (index < 0) {
             ESP_LOGW(TAG, "Ignoring unknown or unavailable Lua module: %s", trimmed);
             continue;
@@ -316,7 +316,7 @@ static esp_err_t app_lua_build_module_map(const char *configured_modules,
 /* --- lua_driver register wrappers --- */
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_ADC
-static esp_err_t app_lua_register_adc(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_adc(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_adc_register();
@@ -324,7 +324,7 @@ static esp_err_t app_lua_register_adc(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_GPIO
-static esp_err_t app_lua_register_gpio(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_gpio(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_gpio_register();
@@ -332,7 +332,7 @@ static esp_err_t app_lua_register_gpio(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_I2C
-static esp_err_t app_lua_register_i2c(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_i2c(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_i2c_register();
@@ -340,7 +340,7 @@ static esp_err_t app_lua_register_i2c(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_MCPWM
-static esp_err_t app_lua_register_mcpwm(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_mcpwm(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_mcpwm_register();
@@ -348,7 +348,7 @@ static esp_err_t app_lua_register_mcpwm(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_PCNT
-static esp_err_t app_lua_register_pcnt(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_pcnt(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_pcnt_register();
@@ -356,7 +356,7 @@ static esp_err_t app_lua_register_pcnt(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_RMT
-static esp_err_t app_lua_register_rmt(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_rmt(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_rmt_register();
@@ -364,7 +364,7 @@ static esp_err_t app_lua_register_rmt(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_TOUCH
-static esp_err_t app_lua_register_touch(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_touch(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_touch_register();
@@ -372,7 +372,7 @@ static esp_err_t app_lua_register_touch(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_UART
-static esp_err_t app_lua_register_uart(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_uart(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_uart_register();
@@ -382,7 +382,7 @@ static esp_err_t app_lua_register_uart(const char *fatfs_base_path)
 /* --- lua_module register wrappers --- */
 
 #if CONFIG_APP_CLAW_LUA_MODULE_AUDIO && defined(CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT)
-static esp_err_t app_lua_register_audio(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_audio(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_audio_register();
@@ -390,7 +390,7 @@ static esp_err_t app_lua_register_audio(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_BOARD_MANAGER
-static esp_err_t app_lua_register_board_manager(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_board_manager(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_board_manager_register();
@@ -398,7 +398,7 @@ static esp_err_t app_lua_register_board_manager(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_BUTTON
-static esp_err_t app_lua_register_button(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_button(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_button_register();
@@ -406,7 +406,7 @@ static esp_err_t app_lua_register_button(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_BLE
-static esp_err_t app_lua_register_ble(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_ble(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_ble_register();
@@ -414,7 +414,7 @@ static esp_err_t app_lua_register_ble(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_BLE_HID
-static esp_err_t app_lua_register_ble_hid(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_ble_hid(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_ble_hid_register();
@@ -422,7 +422,7 @@ static esp_err_t app_lua_register_ble_hid(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_CAMERA && defined(CONFIG_ESP_BOARD_DEV_CAMERA_SUPPORT)
-static esp_err_t app_lua_register_camera(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_camera(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_camera_register();
@@ -430,7 +430,7 @@ static esp_err_t app_lua_register_camera(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_CAPABILITY
-static esp_err_t app_lua_register_capability(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_capability(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_capability_register();
@@ -438,7 +438,7 @@ static esp_err_t app_lua_register_capability(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_DELAY
-static esp_err_t app_lua_register_delay(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_delay(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_delay_register();
@@ -446,7 +446,7 @@ static esp_err_t app_lua_register_delay(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_DISPLAY
-static esp_err_t app_lua_register_display(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_display(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_display_register();
@@ -454,7 +454,7 @@ static esp_err_t app_lua_register_display(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR
-static esp_err_t app_lua_register_environmental_sensor(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_environmental_sensor(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_environmental_sensor_register();
@@ -462,7 +462,7 @@ static esp_err_t app_lua_register_environmental_sensor(const char *fatfs_base_pa
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_EVENT_PUBLISHER
-static esp_err_t app_lua_register_event_publisher(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_event_publisher(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_event_publisher_register();
@@ -470,7 +470,7 @@ static esp_err_t app_lua_register_event_publisher(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_HTTP_SERVER
-static esp_err_t app_lua_register_http_server(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_http_server(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_http_server_register();
@@ -478,7 +478,7 @@ static esp_err_t app_lua_register_http_server(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_JSON
-static esp_err_t app_lua_register_json(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_json(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_json_register();
@@ -486,7 +486,7 @@ static esp_err_t app_lua_register_json(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_IMAGE
-static esp_err_t app_lua_register_image(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_image(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_image_register();
@@ -494,7 +494,7 @@ static esp_err_t app_lua_register_image(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_THREAD
-static esp_err_t app_lua_register_thread(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_thread(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_thread_register();
@@ -502,7 +502,7 @@ static esp_err_t app_lua_register_thread(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_IMU
-static esp_err_t app_lua_register_imu(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_imu(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_imu_register();
@@ -510,7 +510,7 @@ static esp_err_t app_lua_register_imu(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_IR
-static esp_err_t app_lua_register_ir(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_ir(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_ir_register();
@@ -518,7 +518,7 @@ static esp_err_t app_lua_register_ir(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_KNOB
-static esp_err_t app_lua_register_knob(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_knob(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_knob_register();
@@ -526,7 +526,7 @@ static esp_err_t app_lua_register_knob(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_LCD
-static esp_err_t app_lua_register_lcd(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_lcd(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_lcd_register();
@@ -534,7 +534,7 @@ static esp_err_t app_lua_register_lcd(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_DRIVER_LEDC
-static esp_err_t app_lua_register_ledc(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_ledc(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_driver_ledc_register();
@@ -542,7 +542,7 @@ static esp_err_t app_lua_register_ledc(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_LED_STRIP
-static esp_err_t app_lua_register_led_strip(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_led_strip(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_led_strip_register();
@@ -550,14 +550,14 @@ static esp_err_t app_lua_register_led_strip(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_LVGL
-static esp_err_t app_lua_register_lvgl(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_lvgl(const char *fatfs_base_path)
 {
     return lua_module_lvgl_register_with_data_root(fatfs_base_path);
 }
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_MAGNETOMETER
-static esp_err_t app_lua_register_magnetometer(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_magnetometer(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_magnetometer_register();
@@ -565,7 +565,7 @@ static esp_err_t app_lua_register_magnetometer(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_SCI
-static esp_err_t app_lua_register_sci(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_sci(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_sci_register();
@@ -573,7 +573,7 @@ static esp_err_t app_lua_register_sci(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_STORAGE
-static esp_err_t app_lua_register_storage(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_storage(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_storage_register();
@@ -581,7 +581,7 @@ static esp_err_t app_lua_register_storage(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_SYSTEM
-static esp_err_t app_lua_register_system(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_system(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_system_register();
@@ -589,124 +589,124 @@ static esp_err_t app_lua_register_system(const char *fatfs_base_path)
 #endif
 
 #if CONFIG_APP_CLAW_LUA_MODULE_VISION && defined(CONFIG_ESP_BOARD_DEV_CAMERA_SUPPORT)
-static esp_err_t app_lua_register_vision(const char *fatfs_base_path)
+static esp_err_t fatfish_lua_register_vision(const char *fatfs_base_path)
 {
     (void)fatfs_base_path;
     return lua_module_vision_register();
 }
 #endif
 
-static const app_lua_module_entry_t s_lua_module_entries[] = {
+static const fatfish_lua_module_entry_t s_lua_module_entries[] = {
     /* --- lua_driver (hardware peripheral drivers) --- */
 #if CONFIG_APP_CLAW_LUA_DRIVER_ADC
-    { "adc", "ADC", app_lua_register_adc },
+    { "adc", "ADC", fatfish_lua_register_adc },
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_GPIO
-    { "gpio", "GPIO", app_lua_register_gpio },
+    { "gpio", "GPIO", fatfish_lua_register_gpio },
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_I2C
-    { "i2c", "I2C", app_lua_register_i2c },
+    { "i2c", "I2C", fatfish_lua_register_i2c },
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_MCPWM
-    { "mcpwm", "MCPWM", app_lua_register_mcpwm },
+    { "mcpwm", "MCPWM", fatfish_lua_register_mcpwm },
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_PCNT
-    { "pcnt", "PCNT", app_lua_register_pcnt },
+    { "pcnt", "PCNT", fatfish_lua_register_pcnt },
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_RMT
-    { "rmt", "RMT", app_lua_register_rmt },
+    { "rmt", "RMT", fatfish_lua_register_rmt },
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_TOUCH
-    { "touch", "Touch", app_lua_register_touch },
+    { "touch", "Touch", fatfish_lua_register_touch },
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_UART
-    { "uart", "UART", app_lua_register_uart },
+    { "uart", "UART", fatfish_lua_register_uart },
 #endif
     /* --- lua_module (higher-level modules) --- */
 #if CONFIG_APP_CLAW_LUA_MODULE_AUDIO && defined(CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT)
-    { "audio", "Audio", app_lua_register_audio },
+    { "audio", "Audio", fatfish_lua_register_audio },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_BOARD_MANAGER
-    { "board_manager", "Board Manager", app_lua_register_board_manager },
+    { "board_manager", "Board Manager", fatfish_lua_register_board_manager },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_BUTTON
-    { "button", "Button", app_lua_register_button },
+    { "button", "Button", fatfish_lua_register_button },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_BLE
-    { "ble", "BLE", app_lua_register_ble },
+    { "ble", "BLE", fatfish_lua_register_ble },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_BLE_HID
-    { "ble_hid", "BLE HID", app_lua_register_ble_hid },
+    { "ble_hid", "BLE HID", fatfish_lua_register_ble_hid },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_CAMERA && defined(CONFIG_ESP_BOARD_DEV_CAMERA_SUPPORT)
-    { "camera", "Camera", app_lua_register_camera },
+    { "camera", "Camera", fatfish_lua_register_camera },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_CAPABILITY
-    { "capability", "Capability", app_lua_register_capability },
+    { "capability", "Capability", fatfish_lua_register_capability },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_DELAY
-    { "delay", "Delay", app_lua_register_delay },
+    { "delay", "Delay", fatfish_lua_register_delay },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_DISPLAY
-    { "display", "Display", app_lua_register_display },
+    { "display", "Display", fatfish_lua_register_display },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR
-    { "environmental_sensor", "Environmental Sensor", app_lua_register_environmental_sensor },
+    { "environmental_sensor", "Environmental Sensor", fatfish_lua_register_environmental_sensor },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_EVENT_PUBLISHER
-    { "event_publisher", "Event Publisher", app_lua_register_event_publisher },
+    { "event_publisher", "Event Publisher", fatfish_lua_register_event_publisher },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_HTTP_SERVER
-    { "http_server", "HTTP Server", app_lua_register_http_server },
+    { "http_server", "HTTP Server", fatfish_lua_register_http_server },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_JSON
-    { "json", "JSON", app_lua_register_json },
+    { "json", "JSON", fatfish_lua_register_json },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_IMAGE
-    { "image", "Image", app_lua_register_image },
+    { "image", "Image", fatfish_lua_register_image },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_THREAD
-    { "thread", "Thread", app_lua_register_thread },
+    { "thread", "Thread", fatfish_lua_register_thread },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_IMU
-    { "imu", "IMU", app_lua_register_imu },
+    { "imu", "IMU", fatfish_lua_register_imu },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_IR
-    { "ir", "IR", app_lua_register_ir },
+    { "ir", "IR", fatfish_lua_register_ir },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_KNOB
-    { "knob", "Knob", app_lua_register_knob },
+    { "knob", "Knob", fatfish_lua_register_knob },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_LCD
-    { "lcd", "LCD", app_lua_register_lcd },
+    { "lcd", "LCD", fatfish_lua_register_lcd },
 #endif
 #if CONFIG_APP_CLAW_LUA_DRIVER_LEDC
-    { "ledc", "LEDC", app_lua_register_ledc },
+    { "ledc", "LEDC", fatfish_lua_register_ledc },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_LED_STRIP
-    { "led_strip", "LED Strip", app_lua_register_led_strip },
+    { "led_strip", "LED Strip", fatfish_lua_register_led_strip },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_LVGL
-    { "lvgl", "LVGL", app_lua_register_lvgl },
+    { "lvgl", "LVGL", fatfish_lua_register_lvgl },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_MAGNETOMETER
-    { "magnetometer", "Magnetometer", app_lua_register_magnetometer },
+    { "magnetometer", "Magnetometer", fatfish_lua_register_magnetometer },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_SCI
-    { "sci", "DFRobot SCI", app_lua_register_sci },
+    { "sci", "DFRobot SCI", fatfish_lua_register_sci },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_STORAGE
-    { "storage", "Storage", app_lua_register_storage },
+    { "storage", "Storage", fatfish_lua_register_storage },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_SYSTEM
-    { "system", "System", app_lua_register_system },
+    { "system", "System", fatfish_lua_register_system },
 #endif
 #if CONFIG_APP_CLAW_LUA_MODULE_VISION && defined(CONFIG_ESP_BOARD_DEV_CAMERA_SUPPORT)
-    { "vision", "Vision", app_lua_register_vision },
+    { "vision", "Vision", fatfish_lua_register_vision },
 #endif
 };
 
-static const app_lua_module_info_t s_lua_module_infos[] = {
+static const fatfish_lua_module_info_t s_lua_module_infos[] = {
     /* --- lua_driver (hardware peripheral drivers) --- */
 #if CONFIG_APP_CLAW_LUA_DRIVER_ADC
     { "adc", "ADC" },
@@ -816,21 +816,21 @@ static const app_lua_module_info_t s_lua_module_infos[] = {
 #endif
 };
 
-esp_err_t app_lua_modules_register_external(const app_lua_module_external_t *module)
+esp_err_t fatfish_lua_modules_register_external(const fatfish_lua_module_external_t *module)
 {
-    app_lua_module_external_t *slot = NULL;
+    fatfish_lua_module_external_t *slot = NULL;
 
     if (!module || !module->module_id || !module->module_id[0] || !module->reg) {
         return ESP_ERR_INVALID_ARG;
     }
-    if (app_lua_find_entry(s_lua_module_entries,
+    if (fatfish_lua_find_entry(s_lua_module_entries,
                            sizeof(s_lua_module_entries) / sizeof(s_lua_module_entries[0]),
                            module->module_id) >= 0 ||
-            app_lua_find_external_module(module->module_id) >= 0) {
+            fatfish_lua_find_external_module(module->module_id) >= 0) {
         ESP_LOGW(TAG, "Lua module already registered: %s", module->module_id);
         return ESP_ERR_INVALID_STATE;
     }
-    ESP_RETURN_ON_ERROR(app_lua_reserve_external_modules(s_external_module_count + 1),
+    ESP_RETURN_ON_ERROR(fatfish_lua_reserve_external_modules(s_external_module_count + 1),
                         TAG, "Failed to grow external Lua module registry");
 
     slot = &s_external_modules[s_external_module_count++];
@@ -841,16 +841,17 @@ esp_err_t app_lua_modules_register_external(const app_lua_module_external_t *mod
     return ESP_OK;
 }
 
-esp_err_t app_lua_modules_register(const app_claw_config_t *config, const char *fatfs_base_path)
+esp_err_t fatfish_lua_modules_register(const char *enabled_modules,
+                                       const char *fatfs_base_path)
 {
     const size_t builtin_entry_count = sizeof(s_lua_module_entries) / sizeof(s_lua_module_entries[0]);
     const size_t entry_count = builtin_entry_count + s_external_module_count;
-    app_lua_module_entry_t *entries = NULL;
+    fatfish_lua_module_entry_t *entries = NULL;
     bool *selected_map = NULL;
     esp_err_t err = ESP_OK;
     size_t i;
 
-    if (!config) {
+    if (!fatfs_base_path || !fatfs_base_path[0]) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -864,17 +865,17 @@ esp_err_t app_lua_modules_register(const app_claw_config_t *config, const char *
 
     memcpy(entries, s_lua_module_entries, builtin_entry_count * sizeof(entries[0]));
     for (i = 0; i < s_external_module_count; i++) {
-        entries[builtin_entry_count + i] = (app_lua_module_entry_t) {
+        entries[builtin_entry_count + i] = (fatfish_lua_module_entry_t) {
             .module_id = s_external_modules[i].module_id,
             .display_name = s_external_modules[i].display_name,
             .reg = s_external_modules[i].reg,
         };
     }
 
-    err = app_lua_build_module_map(config->enabled_lua_modules,
-                                   entries,
-                                   entry_count,
-                                   selected_map);
+    err = fatfish_lua_build_module_map(enabled_modules,
+                                       entries,
+                                       entry_count,
+                                       selected_map);
     if (err != ESP_OK) {
         free(entries);
         free(selected_map);
@@ -903,8 +904,8 @@ esp_err_t app_lua_modules_register(const app_claw_config_t *config, const char *
     return ESP_OK;
 }
 
-esp_err_t app_lua_modules_get_compiled_modules(const app_lua_module_info_t **modules,
-                                               size_t *count)
+esp_err_t fatfish_lua_modules_get_compiled_modules(
+    const fatfish_lua_module_info_t **modules, size_t *count)
 {
     const size_t builtin_count = sizeof(s_lua_module_infos) / sizeof(s_lua_module_infos[0]);
     const size_t total_count = builtin_count + s_external_module_count;
@@ -920,12 +921,12 @@ esp_err_t app_lua_modules_get_compiled_modules(const app_lua_module_info_t **mod
         return ESP_OK;
     }
 
-    ESP_RETURN_ON_ERROR(app_lua_reserve_module_infos(total_count > 0 ? total_count : 1),
+    ESP_RETURN_ON_ERROR(fatfish_lua_reserve_module_infos(total_count > 0 ? total_count : 1),
                         TAG, "Failed to grow Lua module info cache");
 
     memcpy(s_module_infos, s_lua_module_infos, builtin_count * sizeof(s_module_infos[0]));
     for (i = 0; i < s_external_module_count; i++) {
-        s_module_infos[builtin_count + i] = (app_lua_module_info_t) {
+        s_module_infos[builtin_count + i] = (fatfish_lua_module_info_t) {
             .module_id = s_external_modules[i].module_id,
             .display_name = s_external_modules[i].display_name,
         };

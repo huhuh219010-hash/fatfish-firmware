@@ -729,6 +729,14 @@ static esp_err_t main_start_fatfish_runtime(void)
     return fatfish_runtime_submit_camera_probe(1, 0);
 }
 
+static esp_err_t main_start_fatfish_lua(void)
+{
+    return fatfish_runtime_lua_init(&(fatfish_runtime_lua_config_t) {
+        .hardware_registry = s_hw_registry,
+        .enabled_modules = s_claw_config->enabled_lua_modules,
+    });
+}
+
 void app_main(void)
 {
 #if defined(ESP_MOSAICO_REMOTE_DEBUG) && APP_ENABLE_CLAW_TASKS
@@ -992,6 +1000,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_board_manager_init_device_by_name(ESP_BOARD_DEVICE_NAME_AUDIO_DAC));
     ESP_ERROR_CHECK(esp_board_manager_init_device_by_name(ESP_BOARD_DEVICE_NAME_AUDIO_ADC));
 #endif
+    ESP_ERROR_CHECK(main_start_fatfish_lua());
     ESP_ERROR_CHECK(app_claw_start(s_claw_config, s_hw_registry));
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     ESP_ERROR_CHECK(weather_service_start());

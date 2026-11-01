@@ -1,10 +1,14 @@
 idf_component_register(
     SRCS
         "fatfish_runtime.c"
+        "fatfish_runtime_lua.c"
+        "fatfish_lua_modules.c"
         "fatfish_paths.c"
     INCLUDE_DIRS
         "include"
     REQUIRES
+        cap_lua
+        claw_hw_registry
         mosaico_camera_service
     PRIV_REQUIRES
         freertos

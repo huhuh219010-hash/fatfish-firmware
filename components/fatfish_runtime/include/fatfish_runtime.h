@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "esp_err.h"
+#include "claw_hw_registry.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,8 +79,19 @@ typedef struct {
     uint32_t task_priority;
 } fatfish_runtime_config_t;
 
+typedef struct {
+    claw_hw_registry_handle_t hardware_registry;
+    const char *enabled_modules;
+} fatfish_runtime_lua_config_t;
+
 /** @brief Start the singleton runtime and its command worker. */
 esp_err_t fatfish_runtime_init(const fatfish_runtime_config_t *config);
+
+/** @brief Bind hardware and register the retained Lua modules once. */
+esp_err_t fatfish_runtime_lua_init(
+    const fatfish_runtime_lua_config_t *config);
+
+bool fatfish_runtime_lua_is_initialized(void);
 
 /** @brief Stop the worker and release runtime resources. */
 esp_err_t fatfish_runtime_deinit(void);

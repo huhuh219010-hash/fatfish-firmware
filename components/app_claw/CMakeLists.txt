@@ -36,7 +36,6 @@ set(app_claw_srcs
     "app_claw_hw_bridge.c"
     ${board_resources}
     "app_capabilities.c"
-    "app_lua_modules.c"
 )
 
 idf_component_register(

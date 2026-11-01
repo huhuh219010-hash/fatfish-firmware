@@ -1,4 +1,7 @@
 dependencies:
+  fatfish_runtime:
+    path: ../fatfish_runtime
+
   espressif/cjson:
     version: "^1.7.19"
   lua_module_http_server:

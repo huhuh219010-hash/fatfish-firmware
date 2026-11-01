@@ -5,8 +5,6 @@
  */
 #include "app_capabilities.h"
 
-#include "app_lua_modules.h"
-
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -69,7 +67,6 @@
 #if CONFIG_APP_CLAW_CAP_MEMORY
 #include "claw_memory.h"
 #endif
-#include "fatfish_paths.h"
 #include "esp_check.h"
 #include "esp_log.h"
 
@@ -600,25 +597,6 @@ static esp_err_t app_cap_register_scheduler(const app_claw_config_t *config,
 #endif
 
 #if CONFIG_APP_CLAW_CAP_LUA
-static esp_err_t app_cap_prepare_lua(const app_claw_config_t *config,
-                                     const app_claw_storage_paths_t *paths)
-{
-    /* Builtin Lua libraries are baked into the read-only system partition by
-     * sync_lua_module_resources.py, so require() must search there — not under
-     * paths->lua_root_dir (the writable data root). */
-    const char *system_root = fatfish_paths_get(FATFISH_PATH_SYSTEM);
-    char path_temp[96];
-
-    ESP_RETURN_ON_FALSE(system_root, ESP_ERR_INVALID_STATE, TAG,
-                        "FATFISH_PATH_SYSTEM not configured");
-    snprintf(path_temp, sizeof(path_temp), "%s/scripts/builtin", system_root);
-    cap_lua_add_package_path_dir(path_temp);
-    snprintf(path_temp, sizeof(path_temp), "%s/scripts/builtin/lib", system_root);
-    cap_lua_add_package_path_dir(path_temp);
-
-    return app_lua_modules_register(config, paths->fatfs_base_path);
-}
-
 static esp_err_t app_cap_register_lua(const app_claw_config_t *config,
                                       const app_claw_storage_paths_t *paths)
 {
@@ -778,7 +756,7 @@ static const app_capability_group_entry_t s_capability_group_entries[] = {
     { "cap_scheduler", "Scheduler", "Register scheduler cap", true, NULL, app_cap_register_scheduler },
 #endif
 #if CONFIG_APP_CLAW_CAP_LUA
-    { "cap_lua", "Lua", "Register Lua cap", true, app_cap_prepare_lua, app_cap_register_lua },
+    { "cap_lua", "Lua", "Register Lua cap", true, NULL, app_cap_register_lua },
 #endif
 #if CONFIG_APP_CLAW_CAP_MCP_CLIENT
     { "cap_mcp_client", "MCP Client", "Register MCP client cap", false, NULL, app_cap_register_mcp_client },

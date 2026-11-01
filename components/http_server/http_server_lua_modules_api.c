@@ -5,17 +5,17 @@
  */
 #include "http_server_priv.h"
 
-#include "app_lua_modules.h"
+#include "fatfish_lua_modules.h"
 
 static esp_err_t lua_modules_get_handler(httpd_req_t *req)
 {
-    const app_lua_module_info_t *modules = NULL;
+    const fatfish_lua_module_info_t *modules = NULL;
     size_t module_count = 0;
     cJSON *root = NULL;
     cJSON *items = NULL;
     esp_err_t err;
 
-    err = app_lua_modules_get_compiled_modules(&modules, &module_count);
+    err = fatfish_lua_modules_get_compiled_modules(&modules, &module_count);
     if (err != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to load Lua modules");
     }
