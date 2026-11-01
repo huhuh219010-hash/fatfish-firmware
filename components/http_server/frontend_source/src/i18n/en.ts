@@ -199,7 +199,7 @@ export const en = {
   llmValidationRequiredFields: 'Complete required LLM fields before saving: {fields}.',
   llmValidationMaxTokens: 'Max Tokens must be a positive integer.',
   llmValidationImageMaxBytes: 'Default Image Max Bytes must be a positive integer.',
-  asrSection: 'AI Create Speech Recognition',
+  asrSection: 'Speech Recognition',
   asrPresets: 'ASR Presets',
   asrProviderQwen: 'Qwen',
   asrProviderTrial: 'Trial',

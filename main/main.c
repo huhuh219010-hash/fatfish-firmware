@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include "wifi_manager.h"
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
-#include "cap_im_ai_create.h"
 #include "mosaic_setup.h"
 #include "mosaic_ui.h"
 #include "mosaic_button_platform.h"
@@ -29,7 +28,6 @@
 #include "mosaic_imu_platform.h"
 #endif
 #include "network_provisioning_service.h"
-#include "audio_hub.h"
 #endif
 #include "time.h"
 #include "nvs_flash.h"
@@ -46,10 +44,8 @@
 #include "captive_dns.h"
 #include "cmd_wifi.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "app_config.h"
-#include "claw_endpoint.h"
 #include "region_service.h"
 #include "trial_provider.h"
 #include "cap_system_platform.h"
@@ -65,7 +61,6 @@
 #define APP_ENABLE_CLAW_TASKS     (1)
 #define APP_WEATHER_USER_AGENT \
     "esp-mosaico-claw/1.0 https://github.com/espressif/esp-claw"
-#define APP_ASR_PREBUFFER_MS   3000U
 #define APP_REGION_REFRESH_TIMEOUT_MS 30000U
 
 static const char *TAG = "app";
@@ -77,128 +72,11 @@ static EXT_RAM_BSS_ATTR app_settings_service_handle_t s_app_settings;
 static region_service_handle_t s_region_service;
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
 static EXT_RAM_BSS_ATTR network_provisioning_service_handle_t s_network_provisioning;
-static EXT_RAM_BSS_ATTR asr_service_handle_t s_asr_service;
-static SemaphoreHandle_t s_asr_config_lock;
 
 _Static_assert((int)REGION_SERVICE_AREA_UNKNOWN == (int)MOSAIC_SETUP_REGION_UNKNOWN &&
                (int)REGION_SERVICE_AREA_MAINLAND == (int)MOSAIC_SETUP_REGION_MAINLAND &&
                (int)REGION_SERVICE_AREA_INTERNATIONAL == (int)MOSAIC_SETUP_REGION_INTERNATIONAL,
                "Setup Center region mismatch");
-
-static esp_err_t main_register_ai_create_capability(
-    const app_claw_config_t *config,
-    const app_claw_storage_paths_t *paths)
-{
-    (void)config;
-    (void)paths;
-    return cap_im_ai_create_register_group();
-}
-
-static bool main_asr_config_changed(
-    const app_config_t *before,
-    const app_config_t *after)
-{
-    return before == NULL || after == NULL ||
-           strcmp(before->asr_provider, after->asr_provider) != 0 ||
-           strcmp(before->asr_endpoint_provider, after->asr_endpoint_provider) != 0 ||
-           strcmp(before->asr_api_key, after->asr_api_key) != 0 ||
-           strcmp(before->asr_workspace_id, after->asr_workspace_id) != 0 ||
-           strcmp(before->asr_language_hint, after->asr_language_hint) != 0 ||
-           strcmp(before->asr_model, after->asr_model) != 0 ||
-           strcmp(before->asr_endpoint, after->asr_endpoint) != 0;
-}
-
-static esp_err_t main_set_asr_unavailable(
-    ai_create_voice_readiness_t readiness,
-    esp_err_t error)
-{
-    return mosaic_ui_set_ai_create_voice_status(
-        (ai_create_voice_status_t) {
-            .readiness = readiness,
-            .error = error,
-            .retryable = readiness == AI_CREATE_VOICE_READINESS_PROVIDER_ERROR,
-        });
-}
-
-static esp_err_t main_apply_asr_config(const app_config_t *config)
-{
-    ESP_RETURN_ON_FALSE(config, ESP_ERR_INVALID_ARG, TAG,
-                        "ASR config is NULL");
-    if (!s_asr_config_lock) {
-        s_asr_config_lock = xSemaphoreCreateMutex();
-        ESP_RETURN_ON_FALSE(s_asr_config_lock, ESP_ERR_NO_MEM, TAG,
-                            "Failed to create ASR config lock");
-    }
-
-    xSemaphoreTake(s_asr_config_lock, portMAX_DELAY);
-    asr_service_handle_t previous = s_asr_service;
-    asr_service_handle_t replacement = NULL;
-    audio_capture_handle_t capture = NULL;
-    esp_err_t err;
-    const char *endpoint_provider = config->asr_endpoint_provider;
-    const char *endpoint = config->asr_endpoint[0] ? config->asr_endpoint
-                                                   : ASR_SERVICE_DEFAULT_ENDPOINT;
-
-    if (config->asr_provider[0] &&
-            strcmp(config->asr_provider, "qwen") != 0) {
-        err = main_set_asr_unavailable(
-            AI_CREATE_VOICE_READINESS_PROVIDER_ERROR,
-            ESP_ERR_NOT_SUPPORTED);
-    } else if (!claw_endpoint_is_configured(endpoint_provider, &(claw_endpoint_config_t) {
-                   .service = CLAW_ENDPOINT_SERVICE_ASR,
-                   .base_url = endpoint,
-                   .api_key = config->asr_api_key,
-               })) {
-        err = main_set_asr_unavailable(
-            AI_CREATE_VOICE_READINESS_DISABLED, ESP_ERR_NOT_SUPPORTED);
-    } else if (audio_hub_get_capture(&capture) != ESP_OK || capture == NULL) {
-        err = main_set_asr_unavailable(
-            AI_CREATE_VOICE_READINESS_AUDIO_ERROR,
-            ESP_ERR_INVALID_STATE);
-    } else {
-        err = asr_service_create(&(asr_service_config_t) {
-            .capture = capture,
-            .provider = ASR_SERVICE_PROVIDER_QWEN,
-            .endpoint_provider = endpoint_provider,
-            .api_key = config->asr_api_key,
-            .workspace_id = config->asr_workspace_id[0]
-                                ? config->asr_workspace_id : NULL,
-            .endpoint = endpoint,
-            .model = config->asr_model[0]
-                         ? config->asr_model : ASR_SERVICE_DEFAULT_MODEL,
-            .language_hint = config->asr_language_hint[0]
-                                 ? config->asr_language_hint
-                                 : ASR_SERVICE_DEFAULT_LANGUAGE_HINT,
-            .connect_timeout_ms = 30000,
-            .send_timeout_ms = 3000,
-            .prebuffer_ms = APP_ASR_PREBUFFER_MS,
-        }, &replacement);
-        if (err == ESP_OK) {
-            err = mosaic_ui_set_ai_create_asr(replacement);
-        } else {
-            ESP_LOGW(TAG, "ASR service unavailable: %s",
-                     esp_err_to_name(err));
-            esp_err_t status_err = main_set_asr_unavailable(
-                AI_CREATE_VOICE_READINESS_PROVIDER_ERROR, err);
-            err = status_err;
-        }
-    }
-
-    if (err == ESP_OK) {
-        s_asr_service = replacement;
-        replacement = NULL;
-    }
-    if (replacement) asr_service_delete(replacement);
-    if (err == ESP_OK && previous) asr_service_delete(previous);
-    xSemaphoreGive(s_asr_config_lock);
-
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "ASR runtime configuration applied: enabled=%d provider=%s",
-                 s_asr_service != NULL,
-                 config->asr_provider[0] ? config->asr_provider : "qwen");
-    }
-    return err;
-}
 
 #endif
 
@@ -352,7 +230,6 @@ static esp_err_t main_save_config_internal(
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     app_config_t *previous_config = NULL;
     bool wifi_changed = true;
-    bool asr_changed = true;
 #endif
 
     ESP_RETURN_ON_FALSE(config, ESP_ERR_INVALID_ARG, TAG, "config is NULL");
@@ -364,8 +241,6 @@ static esp_err_t main_save_config_internal(
             app_config_load(previous_config) == ESP_OK) {
         wifi_changed = main_wifi_config_changed(
                            previous_config, config);
-        asr_changed = main_asr_config_changed(
-                          previous_config, config);
     }
     free(previous_config);
 #endif
@@ -387,15 +262,6 @@ static esp_err_t main_save_config_internal(
         ESP_LOGW(TAG, "Failed to update running Claw config: %s", esp_err_to_name(err));
     }
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
-    audio_capture_handle_t capture = NULL;
-    if (asr_changed && audio_hub_get_capture(&capture) == ESP_OK && capture != NULL) {
-        err = main_apply_asr_config(config);
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "Failed to apply saved ASR config: %s",
-                     esp_err_to_name(err));
-            return err;
-        }
-    }
     if (apply_wifi && wifi_changed && s_network_provisioning != NULL) {
         err = network_provisioning_service_reload_and_apply(
                   s_network_provisioning);
@@ -968,15 +834,6 @@ void app_main(void)
         }
     }
 
-#if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
-    ESP_ERROR_CHECK(app_capabilities_register_external_group(
-        &(app_capability_external_group_t) {
-            .group_id = "cap_im_ai_create",
-            .display_name = "Mosaico AI Create",
-            .llm_visible_by_default = false,
-            .reg = main_register_ai_create_capability,
-        }));
-#endif
     ESP_ERROR_CHECK(app_cap_system_platform_init(s_app_settings));
     ESP_ERROR_CHECK(app_claw_set_save_config_callback(main_save_claw_config, NULL));
     ESP_ERROR_CHECK(app_claw_set_network_ready_callback(main_network_ready, NULL));
@@ -1005,7 +862,6 @@ void app_main(void)
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     ESP_ERROR_CHECK(weather_service_start());
 #endif
-    ESP_ERROR_CHECK(main_apply_asr_config(s_config));
     esp_err_t restore_err = app_settings_service_restore_audio(s_app_settings);
     if (restore_err != ESP_OK) {
         ESP_LOGW(TAG, "Saved audio volume was not restored: %s",

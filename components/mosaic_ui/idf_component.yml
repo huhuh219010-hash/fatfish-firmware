@@ -6,10 +6,6 @@ dependencies:
     path: ../../third-party/esp-claw/components/common/audio_hub
   audio_playback:
     path: ../../third-party/esp-claw/components/common/audio_playback
-  asr_service:
-    path: ../asr_service
-  cap_im_ai_create:
-    path: ../cap_im_ai_create
   mosaico_camera_service:
     path: ../mosaico_camera_service
   fatfish_runtime:
@@ -22,8 +18,6 @@ dependencies:
 
   weather_service:
     path: ../weather_service
-  claw_memory:
-    path: ../../third-party/esp-claw/components/claw_modules/claw_memory
   app_registry:
     path: ../../third-party/esp-claw/components/common/app_registry
 

@@ -97,7 +97,7 @@ def build_scene(module_dir: Path, gspc: Path, output_dir: Path,
                 resources = sorted(out.glob("*.grb"))
                 if not resources:
                     raise RuntimeError("GSPC did not generate interact resources")
-            elif module != "ai_create":
+            else:
                 resource_stem = f"{stem}_assets" if module in ASSET_SCENES - {"bluetooth"} else stem
                 resource = out / f"{resource_stem}.grb"
                 if module in {"hub", "camera", "weather"} or resource.is_file():
@@ -109,9 +109,6 @@ def build_scene(module_dir: Path, gspc: Path, output_dir: Path,
             for suffix in suffixes:
                 name = f"{stem}_{suffix}.h"
                 shutil.copyfile(out / name, output_dir / name)
-            if module == "ai_create":
-                for path in [bundle, *(output_dir / f"{stem}_{suffix}.h" for suffix in suffixes)]:
-                    path.chmod(0o644)
     print(f"app bundle: {bundle}")
     return bundle
 

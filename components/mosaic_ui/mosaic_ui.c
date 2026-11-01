@@ -26,7 +26,6 @@
 #include "mosaic_settings.h"
 #include "mosaic_system.h"
 #include "mosaic_system_flow.h"
-#include "mosaic_ai_create_runtime.h"
 
 static const char *TAG = "mosaic_ui";
 
@@ -308,16 +307,6 @@ static void on_camera_availability_notice(char slot, bool available, void *user_
     mosaic_hub_request_quick_slot_camera(slot, available);
 }
 
-esp_err_t mosaic_ui_set_ai_create_asr(asr_service_handle_t asr)
-{
-    return mosaic_ai_create_runtime_set_asr(asr);
-}
-
-esp_err_t mosaic_ui_set_ai_create_voice_status(ai_create_voice_status_t status)
-{
-    return mosaic_ai_create_runtime_set_voice_status(status);
-}
-
 esp_err_t mosaic_welcome_open(void)
 {
     const mosaic_app_descriptor_t *app =
@@ -335,16 +324,6 @@ esp_err_t mosaic_ui_back(void)
         return err;
     }
     return mosaic_loader_request_back();
-}
-
-esp_err_t mosaic_ui_open_ai_create(void)
-{
-    const mosaic_app_descriptor_t *app =
-        mosaic_app_descriptor_for_name("ai_create");
-    if (app == NULL) {
-        return ESP_ERR_NOT_FOUND;
-    }
-    return mosaic_loader_request(app);
 }
 
 static esp_err_t present_quiesce(void *ctx, uint32_t timeout_ms)
@@ -437,9 +416,6 @@ esp_err_t mosaic_ui_start(void)
                             TAG, "init volatile system flow");
         s_system_flow_ready = true;
     }
-
-    ESP_RETURN_ON_ERROR(mosaic_ai_create_runtime_init(), TAG,
-                        "init AI Create runtime failed");
 
     esp_display_presenter_t *presenter = NULL;
     esp_lcd_touch_handle_t touch = NULL;

@@ -197,7 +197,7 @@ export const zhCn: Dict = {
   llmValidationRequiredFields: '保存前请补全 LLM 必填项：{fields}。',
   llmValidationMaxTokens: '最大 Token 数必须是正整数。',
   llmValidationImageMaxBytes: '默认图片大小上限必须是正整数。',
-  asrSection: 'AI Create 语音识别',
+  asrSection: '语音识别',
   asrPresets: 'ASR 预置配置',
   asrProviderQwen: 'Qwen',
   asrProviderTrial: 'Trial',

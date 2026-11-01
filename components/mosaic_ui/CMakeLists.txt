@@ -26,11 +26,6 @@ idf_component_register(
          "common/mosaic_app_shell_titles.c"
          "common/mosaic_settings_model.c"
          "common/mosaic_top_notice.c"
-         "common/ai_create_controller.c"
-         "common/ai_create_voice_port.c"
-         "common/ai_create_session_history.c"
-         "common/ai_create_voice_session.c"
-         "common/mosaic_ai_create_runtime.c"
          "common/qrcodegen/qrcodegen.c"
          ${MOSAIC_APP_MODULE_SOURCES}
     INCLUDE_DIRS "."

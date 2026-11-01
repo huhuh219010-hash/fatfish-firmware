@@ -14,7 +14,6 @@
 #include "mosaic_ui.h"
 
 #define MOSAIC_ACTION_BUTTON_DEVICE     "button_power"
-#define MOSAIC_AI_BUTTON_LONG_PRESS_MS  500U
 
 static const char *TAG = "mosaic_button";
 
@@ -67,17 +66,6 @@ static void back_button_cb(void *button_handle, void *user_data)
     }
 }
 
-static void ai_button_long_press_cb(void *button_handle, void *user_data)
-{
-    (void)button_handle;
-    (void)user_data;
-
-    esp_err_t err = mosaic_ui_open_ai_create();
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "queue AI Create failed: %s", esp_err_to_name(err));
-    }
-}
-
 static esp_err_t register_action_button(void)
 {
     if (s_action_button_registered) {
@@ -98,14 +86,6 @@ static esp_err_t register_action_button(void)
                                back_button_cb, NULL),
         TAG, "register top-key Back");
 
-    button_event_args_t long_press = {
-        .long_press.press_time = MOSAIC_AI_BUTTON_LONG_PRESS_MS,
-    };
-    ESP_RETURN_ON_ERROR(
-        iot_button_register_cb(button, BUTTON_LONG_PRESS_START, &long_press,
-                               ai_button_long_press_cb, NULL),
-        TAG, "register AI button long press");
-
     s_action_button_registered = true;
     return ESP_OK;
 }
@@ -117,8 +97,7 @@ esp_err_t mosaic_button_platform_init(void)
 #if CONFIG_ESP_BOARD_DEV_BUTTON_SUPPORT
     ESP_RETURN_ON_ERROR(register_action_button(), TAG,
                         "register action button");
-    ESP_LOGI(TAG, "button ready: Back=single-click AI Create=hold %u ms",
-             MOSAIC_AI_BUTTON_LONG_PRESS_MS);
+    ESP_LOGI(TAG, "button ready: Back=single-click");
     return ESP_OK;
 #else
     ESP_LOGW(TAG, "board button support is disabled");

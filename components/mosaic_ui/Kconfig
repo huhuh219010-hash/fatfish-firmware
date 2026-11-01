@@ -9,16 +9,6 @@ menu "Mosaic UI (esp-gsp)"
             validation remain enabled. The ui_assets partition contains trusted
             build-time assets and is validated by its asset container.
 
-    config MOSAIC_UI_AI_CREATE_DEVICE_MOCK
-        bool "Use local AI Create response backend"
-        depends on APP_CLAW_MOSAIC_GSP_ENABLE
-        default n
-        help
-            Keep the real device microphone and ASR path, but replace the AI
-            Create Agent gateway with deterministic local response events.
-            This is intended for device-side voice and navigation validation;
-            disable it before testing Agent integration.
-
     config MOSAIC_UI_BLUETOOTH_AUDIO
         bool "Classic Bluetooth A2DP speaker App"
         depends on APP_CLAW_MOSAIC_GSP_ENABLE && BT_CLASSIC_ENABLED && BT_BLUEDROID_ENABLED
