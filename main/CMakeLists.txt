@@ -7,7 +7,6 @@ idf_component_register(
         app_system_config
         audio_hub
         claw_hw_registry
-        claw_event_router
         cmd_wifi
         esp_app_format
         esp_hw_support

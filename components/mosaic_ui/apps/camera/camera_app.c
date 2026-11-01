@@ -18,7 +18,7 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#include "claw_paths.h"
+#include "fatfish_paths.h"
 #include "mosaic_camera.h"
 #if defined(ESP_PLATFORM)
 #include "mosaic_loader.h"
@@ -213,8 +213,8 @@ static const mosaic_app_route_t s_camera_routes[] = {
 static void camera_capture_photo(void)
 {
     char directory[CAMERA_PHOTO_PATH_MAX] = {0};
-    esp_err_t err = claw_paths_join(
-        CLAW_PATH_DATA, CAMERA_PHOTO_DIR,
+    esp_err_t err = fatfish_paths_join(
+        FATFISH_PATH_DATA, CAMERA_PHOTO_DIR,
         directory, sizeof(directory));
     if (err != ESP_OK) {
         printf("mosaic_camera: compose photo directory failed err=%d\n",
@@ -241,8 +241,8 @@ static void camera_capture_photo(void)
     }
 
     char path[CAMERA_PHOTO_PATH_MAX] = {0};
-    err = claw_paths_join(
-        CLAW_PATH_DATA, relative, path, sizeof(path));
+    err = fatfish_paths_join(
+        FATFISH_PATH_DATA, relative, path, sizeof(path));
     if (err == ESP_OK) {
         err = mosaic_camera_capture_photo(path, s_flash_mode == CAMERA_FLASH_AUTO);
     }

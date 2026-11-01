@@ -12,7 +12,7 @@
 #include "app_factory_reset.h"
 #include "app_recovery.h"
 #include "claw_version.h"
-#include "claw_paths.h"
+#include "fatfish_paths.h"
 #include "edge_agent_version.h"
 #include <string.h>
 #include <stdlib.h>
@@ -21,7 +21,6 @@
 #include "wifi_manager.h"
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
 #include "cap_im_ai_create.h"
-#include "claw_event_router.h"
 #include "mosaic_setup.h"
 #include "mosaic_ui.h"
 #include "mosaic_button_platform.h"
@@ -792,11 +791,12 @@ void app_main(void)
 
     /* Publish the resolved storage roots so any component can compose paths
      * without knowing whether data lives on flash or an SD card. */
-    ESP_ERROR_CHECK(claw_paths_set(CLAW_PATH_DATA, app_fs_storage_base_path()));
-    ESP_ERROR_CHECK(claw_paths_set(CLAW_PATH_SYSTEM, app_fs_system_base_path()));
-    ESP_ERROR_CHECK(claw_paths_set_space_provider(CLAW_PATH_DATA,
-                                                  app_fs_get_storage_space,
-                                                  NULL));
+    ESP_ERROR_CHECK(fatfish_paths_set(FATFISH_PATH_DATA,
+                                      app_fs_storage_base_path()));
+    ESP_ERROR_CHECK(fatfish_paths_set(FATFISH_PATH_SYSTEM,
+                                      app_fs_system_base_path()));
+    ESP_ERROR_CHECK(fatfish_paths_set_space_provider(
+        FATFISH_PATH_DATA, app_fs_get_storage_space, NULL));
 
     ESP_ERROR_CHECK(app_settings_service_create(&s_app_settings));
 
@@ -1007,10 +1007,6 @@ void app_main(void)
         ESP_ERROR_CHECK(http_server_start());
     }
 #endif
-#if CONFIG_APP_CLAW_CAP_IM_LOCAL
-    ESP_ERROR_CHECK(http_server_webim_bind_im());
-#endif
-
     /* Confirm local startup before waiting for Wi-Fi. An offline or unpaired
      * device is healthy; incomplete filesystem recovery is not. */
     if (recovery_err == ESP_OK) {

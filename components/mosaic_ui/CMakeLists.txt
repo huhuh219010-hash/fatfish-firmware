@@ -26,7 +26,6 @@ idf_component_register(
          "common/mosaic_app_shell_titles.c"
          "common/mosaic_settings_model.c"
          "common/mosaic_top_notice.c"
-         "common/wechat_binding_flow.c"
          "common/ai_create_controller.c"
          "common/ai_create_voice_port.c"
          "common/ai_create_session_history.c"

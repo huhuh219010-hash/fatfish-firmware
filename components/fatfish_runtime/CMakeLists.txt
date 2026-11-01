@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "fatfish_runtime.c"
+        "fatfish_paths.c"
     INCLUDE_DIRS
         "include"
     REQUIRES

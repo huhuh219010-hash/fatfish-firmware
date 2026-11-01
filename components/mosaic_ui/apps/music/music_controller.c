@@ -13,7 +13,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <strings.h>
-#include "claw_paths.h"
+#include "fatfish_paths.h"
 #endif
 
 #define MUSIC_MAX_TRACKS 16U
@@ -130,8 +130,8 @@ static int compare_tracks(const void *left, const void *right)
 static esp_err_t scan_tracks(music_controller_handle_t controller)
 {
     char directory[MUSIC_PATH_MAX];
-    esp_err_t err = claw_paths_join(CLAW_PATH_DATA, "music", directory,
-                                    sizeof(directory));
+    esp_err_t err = fatfish_paths_join(FATFISH_PATH_DATA, "music", directory,
+                                       sizeof(directory));
     if (err != ESP_OK) {
         return err;
     }

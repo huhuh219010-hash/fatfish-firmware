@@ -27,6 +27,14 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 project(edge_agent VERSION 0.6.0)
 
+# Fatfish owns the logical filesystem roots. Retained ESP-Claw modules keep
+# their existing public header for now, but link to the compatibility symbols
+# implemented by components/fatfish_runtime/fatfish_paths.c.
+idf_component_get_property(claw_core_lib claw_core COMPONENT_LIB)
+get_target_property(claw_core_sources ${claw_core_lib} SOURCES)
+list(FILTER claw_core_sources EXCLUDE REGEX "(^|/)claw_paths\\.c$")
+set_property(TARGET ${claw_core_lib} PROPERTY SOURCES "${claw_core_sources}")
+
 if(COMMAND esp_mosaico_build_profile_finalize)
     esp_mosaico_build_profile_finalize()
 endif()

@@ -55,12 +55,11 @@ LLM_QR_PLACEHOLDER = "setup_llm_qr_placeholder.png"
 
 PAGE_OVERVIEW = 0
 PAGE_NETWORK = 1
-PAGE_WECHAT = 2
-PAGE_LLM = 3
-PAGE_DONE = 4
-PAGE_INTEGRATIONS = 5
-PAGE_REGION = 6
-PAGE_COUNT = 7
+PAGE_LLM = 2
+PAGE_DONE = 3
+PAGE_INTEGRATIONS = 4
+PAGE_REGION = 5
+PAGE_COUNT = 6
 
 FONT_POLICIES = {
     20: auto_charset(), 24: auto_charset(), 30: auto_charset(),
@@ -427,61 +426,6 @@ def qr_page(objs, parent, *, title, subtitle, back_action,
                           name=prompt_bind))
 
 
-def build_wechat(objs, parent):
-    binding = len(objs)
-    objs.append(layer(parent, 0, 0, 480, 480,
-                      name="setup_wechat_binding",
-                      bind="setup_wechat_binding_visible"))
-    qr_page(objs, binding, title=None,
-            subtitle="Preparing QR code",
-            back_action="setup_wechat_cancel",
-            skip_action="setup_center_close",
-            back_bind="setup_wechat_binding_back_visible",
-            skip_bind="setup_wechat_binding_skip_visible",
-            qr_bind="setup_wechat_qr_canvas",
-            subtitle_bind="setup_wechat_bind_status", large=True,
-            code_label=None, qr_frame_pad=0, subtitle_below_qr=True,
-            qr_y_override=132)
-
-    progress = len(objs)
-    objs.append(layer(parent, 0, 0, 480, 480, hidden=True,
-                      name="setup_wechat_progress",
-                      bind="setup_wechat_progress_visible"))
-    objs.append(label(progress, 16, 184, 448, 60,
-                      "Binding", size=56))
-    objs.append(label(progress, 16, 244, 448, 60, "WeChat…", size=56))
-    objs.append(label(progress, 16, 316, 448, 34, "Verifying device…",
-                      size=24, color=ACCENT, bind="setup_wechat_stage_text",
-                      name="setup_wechat_stage_text"))
-    prototype_progress(objs, progress, 364, "setup_wechat_progress_bar")
-
-    success = len(objs)
-    objs.append(layer(parent, 0, 0, 480, 480, hidden=True,
-                      name="setup_wechat_success",
-                      bind="setup_wechat_success_visible"))
-    topbar(objs, success, back="setup_wechat_success_back",
-           back_bind="setup_wechat_success_back_visible")
-    objs.append(image(success, HTML_YES, 190, 120, 100, 100))
-    objs.append(label(success, 24, 242, 432, 44, "Mosaico-Lab", size=34,
-                      align="center"))
-    objs.append(label(success, 24, 292, 432, 34, "Account linked", size=24,
-                      color=MUTED, align="center"))
-    get_started = len(objs)
-    objs.append(layer(success, 64, 362, 352, 86,
-                      name="setup_wechat_success_get_started_visible",
-                      bind="setup_wechat_success_get_started_visible"))
-    objs.append(button(get_started, 0, 0, 352, 86, "Continue",
-                       bg=PANEL, fg=FG, radius=43, size=30,
-                       callback="setup_center_close"))
-    rebind = len(objs)
-    objs.append(layer(success, 64, 362, 352, 86, hidden=True,
-                      name="setup_wechat_success_rebind_visible",
-                      bind="setup_wechat_success_rebind_visible"))
-    objs.append(button(rebind, 0, 0, 352, 86, "Rebind",
-                       bg=PANEL, fg=FG, radius=43, size=30,
-                       callback="setup_wechat_rebind"))
-
-
 def build_llm(objs, parent):
     status = len(objs)
     objs.append(layer(parent, 0, 0, 480, 480, name="setup_llm_status",
@@ -590,7 +534,6 @@ def main():
     })
     build_overview(objs, page(objs, stack, PAGE_OVERVIEW))
     build_network(objs, page(objs, stack, PAGE_NETWORK))
-    build_wechat(objs, page(objs, stack, PAGE_WECHAT))
     build_llm(objs, page(objs, stack, PAGE_LLM))
     build_done(objs, page(objs, stack, PAGE_DONE))
     build_integrations(objs, page(objs, stack, PAGE_INTEGRATIONS))

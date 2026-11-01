@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include "cJSON.h"
-#include "claw_paths.h"
+#include "fatfish_paths.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -1011,9 +1011,9 @@ esp_err_t ai_create_controller_create(const ai_create_controller_config_t *confi
                 sizeof(controller->snapshot.session_alias));
     }
     if (config->persist_journal) {
-        (void)claw_paths_join(CLAW_PATH_DATA, CONTROLLER_JOURNAL_NAME,
-                              controller->journal_path,
-                              sizeof(controller->journal_path));
+        (void)fatfish_paths_join(FATFISH_PATH_DATA, CONTROLLER_JOURNAL_NAME,
+                                 controller->journal_path,
+                                 sizeof(controller->journal_path));
         load_journal(controller);
     }
     if (controller->start_with_new_session) {

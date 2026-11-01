@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "claw_paths.h"
+#include "fatfish_paths.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_mmap_assets.h"
@@ -74,7 +74,7 @@ static esp_err_t load_dynamic_font(mosaic_esp_platform_handle_t platform)
 
     char path[MOSAIC_FONT_PATH_MAX];
     ESP_RETURN_ON_ERROR(
-        claw_paths_join(CLAW_PATH_SYSTEM, MOSAIC_DYNAMIC_FONT_PATH, path,
+        fatfish_paths_join(FATFISH_PATH_SYSTEM, MOSAIC_DYNAMIC_FONT_PATH, path,
             sizeof(path)),
         "mosaic_platform", "resolve dynamic font path");
 

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "app_claw.h"
-#include "app_claw_cli.h"
 #include "app_capabilities.h"
 #include "audio_hub.h"
 #if CONFIG_APP_CLAW_SYSTEM_UI_ENABLE
@@ -26,7 +25,7 @@
 #if CONFIG_APP_CLAW_CAP_SESSION_MGR
 #include "cap_session_mgr.h"
 #endif
-#include "claw_paths.h"
+#include "fatfish_paths.h"
 #if CONFIG_APP_CLAW_CAP_CORE
 #include "claw_cap.h"
 #include "claw_core.h"
@@ -787,38 +786,38 @@ static void app_time_sync_success(bool had_valid_time, void *ctx)
 #endif
 
 // Resolve the storage paths threaded through the capability framework from the
-// logical homes registered in claw_paths. This is where app_claw owns the data
+// logical homes registered in fatfish_paths. This is where app_claw owns the data
 // layout (the subdirectory convention); main only decides the mount points.
 static esp_err_t build_storage_paths(app_claw_storage_paths_t *paths)
 {
     memset(paths, 0, sizeof(*paths));
 
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, NULL, paths->fatfs_base_path, sizeof(paths->fatfs_base_path)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, NULL, paths->fatfs_base_path, sizeof(paths->fatfs_base_path)),
                         TAG, "data home unavailable");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, "sessions", paths->memory_session_root, sizeof(paths->memory_session_root)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, "sessions", paths->memory_session_root, sizeof(paths->memory_session_root)),
                         TAG, "session root path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, "memory", paths->memory_root_dir, sizeof(paths->memory_root_dir)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, "memory", paths->memory_root_dir, sizeof(paths->memory_root_dir)),
                         TAG, "memory root path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, "skills", paths->skills_root_dir, sizeof(paths->skills_root_dir)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, "skills", paths->skills_root_dir, sizeof(paths->skills_root_dir)),
                         TAG, "skills root path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, "apps", paths->apps_root_dir, sizeof(paths->apps_root_dir)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, "apps", paths->apps_root_dir, sizeof(paths->apps_root_dir)),
                         TAG, "App root path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, "scripts", paths->lua_root_dir, sizeof(paths->lua_root_dir)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, "scripts", paths->lua_root_dir, sizeof(paths->lua_root_dir)),
                         TAG, "lua root path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, "router_rules/router_rules.json", paths->router_rules_path, sizeof(paths->router_rules_path)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, "router_rules/router_rules.json", paths->router_rules_path, sizeof(paths->router_rules_path)),
                         TAG, "router rules path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_SYSTEM, ".recovery/router_rules/router_rules.json", paths->router_recovery_path, sizeof(paths->router_recovery_path)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_SYSTEM, ".recovery/router_rules/router_rules.json", paths->router_recovery_path, sizeof(paths->router_recovery_path)),
                         TAG, "router recovery path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, "scheduler/schedules.json", paths->scheduler_rules_path, sizeof(paths->scheduler_rules_path)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, "scheduler/schedules.json", paths->scheduler_rules_path, sizeof(paths->scheduler_rules_path)),
                         TAG, "scheduler rules path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_SYSTEM, ".recovery/scheduler/schedules.json", paths->scheduler_recovery_path, sizeof(paths->scheduler_recovery_path)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_SYSTEM, ".recovery/scheduler/schedules.json", paths->scheduler_recovery_path, sizeof(paths->scheduler_recovery_path)),
                         TAG, "scheduler recovery path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_DATA, "inbox", paths->im_attachment_root, sizeof(paths->im_attachment_root)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_DATA, "inbox", paths->im_attachment_root, sizeof(paths->im_attachment_root)),
                         TAG, "inbox path too long");
 
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_SYSTEM, "skills", paths->system_skills_root_dir, sizeof(paths->system_skills_root_dir)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_SYSTEM, "skills", paths->system_skills_root_dir, sizeof(paths->system_skills_root_dir)),
                         TAG, "system skills root path too long");
-    ESP_RETURN_ON_ERROR(claw_paths_join(CLAW_PATH_SYSTEM, "apps", paths->system_apps_root_dir, sizeof(paths->system_apps_root_dir)),
+    ESP_RETURN_ON_ERROR(fatfish_paths_join(FATFISH_PATH_SYSTEM, "apps", paths->system_apps_root_dir, sizeof(paths->system_apps_root_dir)),
                         TAG, "system App root path too long");
 
     return ESP_OK;
@@ -971,9 +970,6 @@ esp_err_t app_claw_start(const app_claw_config_t *config, claw_hw_registry_handl
                     }));
 #endif
 
-#if CONFIG_APP_CLAW_ENABLE_CLI
-    ESP_RETURN_ON_ERROR(app_claw_cli_start(registry), TAG, "Failed to start CLI");
-#endif
 #if CONFIG_APP_CLAW_CAP_EVENT_ROUTER
     ESP_RETURN_ON_ERROR(app_claw_publish_startup_event(), TAG,
                         "Failed to publish startup event");

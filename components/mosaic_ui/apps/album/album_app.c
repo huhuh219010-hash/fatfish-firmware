@@ -34,7 +34,7 @@
 #endif
 
 #if defined(ESP_PLATFORM)
-#include "claw_paths.h"
+#include "fatfish_paths.h"
 #endif
 
 #define ALBUM_MAX_PHOTOS 128U
@@ -312,7 +312,8 @@ static void album_scan_esp_defaults(void)
         return;
     }
     for (size_t index = 0; index < sizeof(dirs) / sizeof(dirs[0]); ++index) {
-        esp_err_t err = claw_paths_join(CLAW_PATH_DATA, dirs[index], path, ALBUM_PATH_MAX);
+        esp_err_t err = fatfish_paths_join(FATFISH_PATH_DATA, dirs[index],
+                                           path, ALBUM_PATH_MAX);
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "compose scan dir failed: %s", dirs[index]);
             continue;

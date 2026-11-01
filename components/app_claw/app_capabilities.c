@@ -69,7 +69,7 @@
 #if CONFIG_APP_CLAW_CAP_MEMORY
 #include "claw_memory.h"
 #endif
-#include "claw_paths.h"
+#include "fatfish_paths.h"
 #include "esp_check.h"
 #include "esp_log.h"
 
@@ -606,10 +606,11 @@ static esp_err_t app_cap_prepare_lua(const app_claw_config_t *config,
     /* Builtin Lua libraries are baked into the read-only system partition by
      * sync_lua_module_resources.py, so require() must search there — not under
      * paths->lua_root_dir (the writable data root). */
-    const char *system_root = claw_paths_get(CLAW_PATH_SYSTEM);
+    const char *system_root = fatfish_paths_get(FATFISH_PATH_SYSTEM);
     char path_temp[96];
 
-    ESP_RETURN_ON_FALSE(system_root, ESP_ERR_INVALID_STATE, TAG, "CLAW_PATH_SYSTEM not configured");
+    ESP_RETURN_ON_FALSE(system_root, ESP_ERR_INVALID_STATE, TAG,
+                        "FATFISH_PATH_SYSTEM not configured");
     snprintf(path_temp, sizeof(path_temp), "%s/scripts/builtin", system_root);
     cap_lua_add_package_path_dir(path_temp);
     snprintf(path_temp, sizeof(path_temp), "%s/scripts/builtin/lib", system_root);

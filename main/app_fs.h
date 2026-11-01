@@ -38,7 +38,7 @@ const char *app_fs_system_base_path(void);
  * @brief  Query the active writable filesystem capacity.
  *
  *         The ctx argument is unused and allows direct registration as a
- *         claw_path_space_provider_t callback.
+ *         fatfish_path_space_provider_t callback.
  */
 esp_err_t app_fs_get_storage_space(void *ctx,
                                    uint64_t *total_bytes,

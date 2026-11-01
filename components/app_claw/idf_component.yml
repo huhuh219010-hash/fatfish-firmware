@@ -1,4 +1,7 @@
 dependencies:
+  fatfish_runtime:
+    path: ../fatfish_runtime
+
   claw_hw_registry:
     path: ../../third-party/esp-claw/components/common/claw_hw_registry
 

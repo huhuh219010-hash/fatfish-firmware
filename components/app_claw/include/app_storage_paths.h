@@ -14,8 +14,8 @@ extern "C" {
 /**
  * @brief  Resolved storage paths threaded through the capability framework
  *
- *         Built inside app_claw from the logical homes registered in claw_paths
- *         (see claw_paths.h); not part of the public app_claw API. Each field is
+ *         Built inside app_claw from the logical homes registered in fatfish_paths
+ *         (see fatfish_paths.h); not part of the public app_claw API. Each field is
  *         an absolute path derived from a home plus a fixed subdirectory.
  */
 typedef struct {

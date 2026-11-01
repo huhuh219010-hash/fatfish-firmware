@@ -26,11 +26,9 @@
 #include "mosaic_runtime.h"
 #include "mosaic_settings.h"
 #include "mosaic_top_notice.h"
-#include "wechat_binding_flow.h"
 #include "setup_center_actions.h"
 #include "setup_center_binds.h"
 #include "setup_center_objects.h"
-#include "setup_center_wechat_queue.h"
 #if defined(ESP_PLATFORM)
 #include "mosaic_loader.h"
 #endif
@@ -38,11 +36,10 @@
 #define SETUP_CENTER_APP_ID 10U
 #define SETUP_PAGE_OVERVIEW 0U
 #define SETUP_PAGE_NETWORK  1U
-#define SETUP_PAGE_WECHAT   2U
-#define SETUP_PAGE_LLM      3U
-#define SETUP_PAGE_DONE     4U
-#define SETUP_PAGE_INTEGRATIONS 5U
-#define SETUP_PAGE_REGION   6U
+#define SETUP_PAGE_LLM      2U
+#define SETUP_PAGE_DONE     3U
+#define SETUP_PAGE_INTEGRATIONS 4U
+#define SETUP_PAGE_REGION   5U
 #define SETUP_PAGE_LAST     SETUP_PAGE_REGION
 #define SETUP_NETWORK_MOCK_COUNT 10U
 #define SETUP_PASSWORD_MIN  8U
@@ -50,7 +47,6 @@
 #define SETUP_NAV_GUARD_US  400000LL
 #define SETUP_NETWORK_SCAN_US 900000LL
 #define SETUP_NETWORK_JOIN_US 3000000LL
-#define SETUP_WECHAT_REAL_STAGE_US 500000LL
 #define SETUP_LLM_CONFIG_US 2200000LL
 #define SETUP_REGION_WAIT_SECONDS 10U
 #define SETUP_REGION_WAIT_US ((int64_t)SETUP_REGION_WAIT_SECONDS * 1000000LL)
@@ -75,24 +71,6 @@ typedef enum {
     SETUP_NETWORK_JOINING,
     SETUP_NETWORK_CONNECTED,
 } setup_network_phase_t;
-
-typedef enum {
-    SETUP_WECHAT_BINDING = 0,
-    SETUP_WECHAT_PROGRESS,
-    SETUP_WECHAT_SUCCESS,
-} setup_wechat_phase_t;
-
-typedef enum {
-    SETUP_WECHAT_INTENT_VIEW_STATUS = 0,
-    SETUP_WECHAT_INTENT_BIND_ACTIVE,
-    SETUP_WECHAT_INTENT_REBIND_ACTIVE,
-    SETUP_WECHAT_INTENT_NEWLY_COMPLETED,
-} setup_wechat_intent_t;
-
-typedef enum {
-    SETUP_WECHAT_ENTRY_APP = 0,
-    SETUP_WECHAT_ENTRY_ONBOARDING,
-} setup_wechat_entry_t;
 
 typedef enum {
     SETUP_REGION_WAITING = 0,
@@ -122,15 +100,9 @@ typedef struct {
     bool network_configured;
     bool network_skipped;
     bool network_newly_connected;
-    bool wechat_configured;
-    bool wechat_skipped;
-    setup_wechat_intent_t wechat_intent;
-    setup_wechat_entry_t wechat_entry;
     bool llm_configured;
     bool llm_skipped;
     setup_network_phase_t network_phase;
-    setup_wechat_phase_t wechat_phase;
-    wechat_binding_flow_t wechat_flow;
     setup_llm_phase_t llm_phase;
     setup_region_phase_t region_phase;
     mosaic_setup_region_ops_t region_ops;
@@ -155,18 +127,9 @@ typedef struct {
     uint32_t rendered_network_revision;
     bool network_connect_pending;
     bool wifi_subscribed;
-    mosaic_setup_wechat_ops_t wechat_ops;
-    mosaic_setup_wechat_status_t wechat_status;
-    uint32_t wechat_revision;
-    uint32_t rendered_wechat_revision;
-    uint32_t wechat_operation_revision;
-    setup_wechat_event_queue_t wechat_events;
-    int64_t wechat_stage_deadline_us;
     uint8_t *qr_temp;
     uint8_t *qr_code;
     setup_qr_frame_t qr_frames[SETUP_QR_FRAME_COUNT];
-    char rendered_wechat_qr[MOSAIC_SETUP_WECHAT_QR_LEN];
-    char pending_wechat_qr[MOSAIC_SETUP_WECHAT_QR_LEN];
     char rendered_llm_qr[SETUP_LLM_URL_LEN];
     char rendered_network_phone_qr[MOSAIC_SETTINGS_PHONE_QR_LEN];
     char llm_config_url[SETUP_LLM_URL_LEN];
@@ -215,21 +178,6 @@ static const uint16_t s_network_progress[SETUP_PROGRESS_COUNT] = {
     GSP_BIND_SETUP_NETWORK_PROGRESS_12,
 };
 
-static const uint16_t s_wechat_progress[SETUP_PROGRESS_COUNT] = {
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_01,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_02,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_03,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_04,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_05,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_06,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_07,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_08,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_09,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_10,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_11,
-    GSP_BIND_SETUP_WECHAT_PROGRESS_BAR_12,
-};
-
 static const uint16_t s_llm_progress[SETUP_PROGRESS_COUNT] = {
     GSP_BIND_SETUP_LLM_PROGRESS_BAR_01,
     GSP_BIND_SETUP_LLM_PROGRESS_BAR_02,
@@ -244,57 +192,6 @@ static const uint16_t s_llm_progress[SETUP_PROGRESS_COUNT] = {
     GSP_BIND_SETUP_LLM_PROGRESS_BAR_11,
     GSP_BIND_SETUP_LLM_PROGRESS_BAR_12,
 };
-
-esp_err_t mosaic_setup_configure_wechat(
-    const mosaic_setup_wechat_ops_t *ops)
-{
-    if (ops == NULL || ops->start == NULL || ops->cancel == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    SETUP_MODEL_LOCK();
-    s_setup.wechat_ops = *ops;
-    SETUP_MODEL_UNLOCK();
-    return ESP_OK;
-}
-
-esp_err_t mosaic_setup_set_wechat_status(
-    const mosaic_setup_wechat_status_t *status)
-{
-    if (status == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    SETUP_MODEL_LOCK();
-    s_setup.wechat_status = *status;
-    const uint32_t revision = ++s_setup.wechat_revision;
-    /* The binding worker may publish SCANNED, SAVING and COMPLETE before
-     * the next UI tick. Preserve every observable transition while this
-     * page is active instead of reducing the stream to its latest value. */
-    const bool observable =
-        status->state != MOSAIC_SETUP_WECHAT_IDLE;
-    if (observable && s_setup.ui != NULL &&
-            s_setup.page == SETUP_PAGE_WECHAT) {
-        setup_wechat_event_queue_push(
-            &s_setup.wechat_events, status, revision);
-    }
-    SETUP_MODEL_UNLOCK();
-    return ESP_OK;
-}
-
-esp_err_t mosaic_setup_get_wechat_service(
-    mosaic_setup_wechat_ops_t *ret_ops,
-    mosaic_setup_wechat_status_t *ret_status,
-    uint32_t *ret_revision)
-{
-    if (ret_ops == NULL || ret_status == NULL || ret_revision == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    SETUP_MODEL_LOCK();
-    *ret_ops = s_setup.wechat_ops;
-    *ret_status = s_setup.wechat_status;
-    *ret_revision = s_setup.wechat_revision;
-    SETUP_MODEL_UNLOCK();
-    return ESP_OK;
-}
 
 esp_err_t mosaic_setup_configure_region(
     const mosaic_setup_region_ops_t *ops)
@@ -333,15 +230,6 @@ static mosaic_setup_region_ops_t setup_region_ops(void)
     const mosaic_setup_region_ops_t ops = s_setup.region_ops;
     SETUP_MODEL_UNLOCK();
     return ops;
-}
-
-static bool setup_wechat_has_backend(void)
-{
-    bool configured;
-    SETUP_MODEL_LOCK();
-    configured = wechat_binding_flow_has_backend(&s_setup.wechat_ops);
-    SETUP_MODEL_UNLOCK();
-    return configured;
 }
 
 static void *setup_qr_alloc(size_t bytes)
@@ -485,54 +373,6 @@ static bool setup_qr_render(
         }
     }
     return true;
-}
-
-static void setup_wechat_push_qr(const char *payload, int64_t now_us)
-{
-    if (s_setup.ui == NULL || payload == NULL || payload[0] == '\0' ||
-            strcmp(payload, s_setup.rendered_wechat_qr) == 0) {
-        return;
-    }
-    /* StackView captures its transition target when the navigation command
-     * is applied.  A Canvas push in the same transition window creates a
-     * second full-resource present on top of that frozen target.  Keep the
-     * verified payload, then publish it once after the page animation has
-     * retired so the high-contrast QR reaches the panel in one stable frame. */
-    if (payload != s_setup.pending_wechat_qr) {
-        strlcpy(s_setup.pending_wechat_qr, payload,
-                sizeof(s_setup.pending_wechat_qr));
-    }
-    if (now_us < s_setup.navigation_guard_until_us) {
-        return;
-    }
-    /* Operations may be registered after the App instance was created.
-     * Allocate lazily as well as at start so the real service can always
-     * replace the authored placeholder. */
-    if (setup_qr_ensure_buffers() != ESP_OK) {
-        ESP_LOGW(TAG, "allocate WeChat QR buffers failed");
-        return;
-    }
-    setup_qr_frame_t *frame = setup_qr_acquire();
-    if (frame == NULL) {
-        ESP_LOGW(TAG, "no free WeChat QR frame");
-        return;
-    }
-    if (!setup_qr_render(payload, frame->pixels, SETUP_QR_SIZE)) {
-        setup_qr_released(frame);
-        ESP_LOGW(TAG, "render WeChat QR failed");
-        return;
-    }
-    const esp_gsp_err_t err = esp_gsp_canvas_push(
-        s_setup.ui, GSP_BIND_SETUP_WECHAT_QR_CANVAS,
-        frame->pixels, SETUP_QR_STRIDE, setup_qr_released, frame);
-    if (err != ESP_GSP_OK) {
-        setup_qr_released(frame);
-        ESP_LOGW(TAG, "push WeChat QR failed: %d", (int)err);
-        return;
-    }
-    strlcpy(s_setup.rendered_wechat_qr, payload,
-            sizeof(s_setup.rendered_wechat_qr));
-    s_setup.pending_wechat_qr[0] = '\0';
 }
 
 static void setup_llm_push_qr(const char *payload)
@@ -702,10 +542,6 @@ static void setup_navigation_render(void)
         s_setup.ui, visible);
     (void)gsp_setup_center_setup_network_skip_visible_set_visible(
         s_setup.ui, onboarding);
-    (void)gsp_setup_center_setup_wechat_binding_back_visible_set_visible(
-        s_setup.ui, visible);
-    (void)gsp_setup_center_setup_wechat_binding_skip_visible_set_visible(
-        s_setup.ui, onboarding);
     (void)gsp_setup_center_setup_llm_status_back_visible_set_visible(
         s_setup.ui, visible);
     (void)gsp_setup_center_setup_llm_status_skip_visible_set_visible(
@@ -859,205 +695,6 @@ static void setup_network_render(void)
     }
 }
 
-static void setup_wechat_render(void)
-{
-    const bool binding = s_setup.wechat_phase == SETUP_WECHAT_BINDING;
-    const bool progress = s_setup.wechat_phase == SETUP_WECHAT_PROGRESS;
-    const bool success = s_setup.wechat_phase == SETUP_WECHAT_SUCCESS;
-    const bool onboarding =
-        s_setup.wechat_entry == SETUP_WECHAT_ENTRY_ONBOARDING;
-    (void)gsp_setup_center_setup_wechat_binding_set_visible(
-        s_setup.ui, binding);
-    (void)gsp_setup_center_setup_wechat_progress_set_visible(
-        s_setup.ui, progress);
-    (void)gsp_setup_center_setup_wechat_success_set_visible(
-        s_setup.ui, success);
-    (void)gsp_setup_center_setup_wechat_success_back_visible_set_visible(
-        s_setup.ui, success && !onboarding);
-    (void)gsp_setup_center_setup_wechat_success_get_started_visible_set_visible(
-        s_setup.ui, success && onboarding);
-    (void)gsp_setup_center_setup_wechat_success_rebind_visible_set_visible(
-        s_setup.ui, success && !onboarding);
-}
-
-static setup_wechat_intent_t setup_wechat_success_intent(void)
-{
-    return s_setup.wechat_entry == SETUP_WECHAT_ENTRY_ONBOARDING
-        ? SETUP_WECHAT_INTENT_NEWLY_COMPLETED
-        : SETUP_WECHAT_INTENT_VIEW_STATUS;
-}
-
-static esp_err_t setup_wechat_start_service(bool force)
-{
-    mosaic_setup_wechat_ops_t ops;
-    mosaic_setup_wechat_status_t status;
-    SETUP_MODEL_LOCK();
-    ops = s_setup.wechat_ops;
-    setup_wechat_event_queue_reset(&s_setup.wechat_events);
-    s_setup.wechat_stage_deadline_us = 0;
-    /* A configured service retains its previous COMPLETE snapshot while a
-     * forced login worker is being created. Only revisions published after
-     * this boundary belong to the new bind/rebind operation. */
-    s_setup.wechat_operation_revision = s_setup.wechat_revision;
-    status = s_setup.wechat_status;
-    SETUP_MODEL_UNLOCK();
-    const esp_err_t err =
-        wechat_binding_flow_start_backend(&ops, &status, force);
-    if (err != ESP_OK && s_setup.ui != NULL) {
-        (void)mosaic_top_notice_show(
-            s_setup.ui, &s_notice, "Unable to bind WeChat",
-            esp_err_to_name(err), 2600);
-    }
-    return err;
-}
-
-#if defined(ESP_PLATFORM)
-static void setup_wechat_cancel_service(void)
-{
-    mosaic_setup_wechat_ops_t ops;
-    SETUP_MODEL_LOCK();
-    ops = s_setup.wechat_ops;
-    SETUP_MODEL_UNLOCK();
-    (void)wechat_binding_flow_cancel_backend(&ops);
-}
-#endif
-
-static void setup_wechat_disarm_operation(void)
-{
-    SETUP_MODEL_LOCK();
-    setup_wechat_event_queue_reset(&s_setup.wechat_events);
-    s_setup.wechat_stage_deadline_us = 0;
-    s_setup.wechat_operation_revision = s_setup.wechat_revision;
-    SETUP_MODEL_UNLOCK();
-    s_setup.operation_deadline_us = 0;
-    s_setup.wechat_intent = SETUP_WECHAT_INTENT_VIEW_STATUS;
-    s_setup.wechat_phase = s_setup.wechat_configured
-        ? SETUP_WECHAT_SUCCESS : SETUP_WECHAT_BINDING;
-}
-
-#if defined(ESP_PLATFORM)
-static void setup_wechat_cancel_deferred(void *user_ctx)
-{
-    (void)user_ctx;
-    setup_wechat_cancel_service();
-}
-
-static void setup_wechat_schedule_cancel(void)
-{
-    const esp_err_t err = mosaic_loader_defer(
-        setup_wechat_cancel_deferred, NULL);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "defer WeChat cancellation failed: %s",
-                 esp_err_to_name(err));
-        /* Never fall back to a synchronous service call here: this action is
-         * dispatched while GSP owns the runtime lock, while cancellation may
-         * wait for the binding worker/gateway.  Keeping the UI route usable is
-         * safer than turning an exceptional deferred-slot failure into a
-         * loader deadlock. */
-    }
-}
-#else
-static void setup_wechat_schedule_cancel(void)
-{
-}
-#endif
-
-static void setup_wechat_apply_model(int64_t now_us)
-{
-    if (s_setup.ui == NULL || !setup_wechat_has_backend()) {
-        return;
-    }
-    mosaic_setup_wechat_status_t status;
-    uint32_t revision;
-    bool queued = false;
-    SETUP_MODEL_LOCK();
-    revision = s_setup.wechat_revision;
-    status = s_setup.wechat_status;
-    if (s_setup.wechat_events.count > 0U) {
-        if (s_setup.wechat_stage_deadline_us > now_us) {
-            SETUP_MODEL_UNLOCK();
-            return;
-        }
-        setup_wechat_event_t event;
-        queued = setup_wechat_event_queue_pop(
-            &s_setup.wechat_events, &event);
-        status = event.status;
-        revision = event.revision;
-        const bool intermediate =
-            status.state == MOSAIC_SETUP_WECHAT_SCANNED ||
-            status.state == MOSAIC_SETUP_WECHAT_SAVING ||
-            status.state == MOSAIC_SETUP_WECHAT_AWAITING_SAVE;
-        s_setup.wechat_stage_deadline_us = intermediate
-            ? now_us + SETUP_WECHAT_REAL_STAGE_US : 0;
-    }
-    SETUP_MODEL_UNLOCK();
-    const bool operation_active =
-        s_setup.wechat_intent == SETUP_WECHAT_INTENT_BIND_ACTIVE ||
-        s_setup.wechat_intent == SETUP_WECHAT_INTENT_REBIND_ACTIVE;
-    if (!queued && operation_active &&
-            revision <= s_setup.wechat_operation_revision) {
-        /* Do not let the previous configured/COMPLETE snapshot terminate a
-         * newly started operation before its worker publishes a new state. */
-        return;
-    }
-    if (!queued && revision == s_setup.rendered_wechat_revision) {
-        /* A canvas push can temporarily fail while StackView is changing
-         * pages.  The service model has not changed in that case, so retry
-         * the same verified login URL until the QR frame is accepted instead
-         * of leaving the authored placeholder visible on the device. */
-        if (s_setup.page == SETUP_PAGE_WECHAT &&
-                status.state == MOSAIC_SETUP_WECHAT_WAITING_SCAN &&
-                status.qr_payload[0] != '\0' &&
-                strcmp(status.qr_payload,
-                       s_setup.rendered_wechat_qr) != 0) {
-            setup_wechat_push_qr(status.qr_payload, now_us);
-        }
-        return;
-    }
-    s_setup.rendered_wechat_revision = revision;
-    (void)wechat_binding_flow_apply_status(
-        &s_setup.wechat_flow, &status, operation_active);
-    s_setup.wechat_configured = s_setup.wechat_flow.configured;
-    s_setup.wechat_phase = s_setup.wechat_flow.phase ==
-            WECHAT_BINDING_FLOW_SUCCESS
-        ? SETUP_WECHAT_SUCCESS
-        : (s_setup.wechat_flow.phase == WECHAT_BINDING_FLOW_PROGRESS
-            ? SETUP_WECHAT_PROGRESS : SETUP_WECHAT_BINDING);
-    if (s_setup.wechat_flow.stage[0] != '\0') {
-        (void)gsp_setup_center_setup_wechat_stage_text_set_text(
-            s_setup.ui, s_setup.wechat_flow.stage);
-    }
-    setup_progress_render(
-        s_wechat_progress, s_setup.wechat_flow.progress);
-    /* Setup Center keeps all steps in one StackView. Never consume a QR
-     * payload while its page is hidden. */
-    if (s_setup.page == SETUP_PAGE_WECHAT &&
-            s_setup.wechat_flow.qr_payload[0] != '\0') {
-        setup_wechat_push_qr(s_setup.wechat_flow.qr_payload, now_us);
-    }
-    if (status.state == MOSAIC_SETUP_WECHAT_COMPLETE) {
-        s_setup.wechat_intent = setup_wechat_success_intent();
-        if (s_setup.mode == MOSAIC_SETUP_MODE_ONBOARDING) {
-            s_setup.onboarding_complete = true;
-        }
-    } else if ((status.state == MOSAIC_SETUP_WECHAT_CANCELLED ||
-                status.state == MOSAIC_SETUP_WECHAT_EXPIRED ||
-                status.state == MOSAIC_SETUP_WECHAT_ERROR) &&
-            s_setup.wechat_configured) {
-        s_setup.wechat_intent = setup_wechat_success_intent();
-    }
-    (void)gsp_setup_center_setup_wechat_bind_status_set_text(
-        s_setup.ui, s_setup.wechat_flow.bind_status);
-    setup_wechat_render();
-    if (status.state == MOSAIC_SETUP_WECHAT_EXPIRED ||
-            status.state == MOSAIC_SETUP_WECHAT_ERROR) {
-        (void)mosaic_top_notice_show(
-            s_setup.ui, &s_notice, "WeChat binding failed",
-            s_setup.wechat_flow.bind_status, 2600);
-    }
-    setup_overview_render();
-}
-
 static void setup_llm_render(void)
 {
     const bool status = s_setup.llm_phase == SETUP_LLM_STATUS;
@@ -1181,54 +818,6 @@ static void setup_open_network(int64_t now_us)
     }
     setup_network_render();
     (void)setup_push(SETUP_PAGE_NETWORK, true, now_us);
-}
-
-static void setup_wechat_begin_simulation(int64_t now_us)
-{
-    /* Host-only behavior selected by the absence of platform operations.
-     * It preserves the same visible state order as the real service while
-     * keeping all device transitions exclusively event-driven. */
-    wechat_binding_flow_begin_simulation(&s_setup.wechat_flow, now_us);
-    s_setup.wechat_phase = SETUP_WECHAT_BINDING;
-    s_setup.rendered_progress = UINT8_MAX;
-    (void)gsp_setup_center_setup_wechat_bind_status_set_text(
-        s_setup.ui, s_setup.wechat_flow.bind_status);
-    setup_wechat_render();
-    setup_wechat_push_qr(s_setup.wechat_flow.qr_payload, now_us);
-}
-
-static void setup_open_wechat(
-    int64_t now_us, setup_wechat_entry_t entry)
-{
-    const bool backend = setup_wechat_has_backend();
-    mosaic_setup_wechat_status_t status = {0};
-    if (backend) {
-        SETUP_MODEL_LOCK();
-        status = s_setup.wechat_status;
-        SETUP_MODEL_UNLOCK();
-        s_setup.wechat_configured = status.configured;
-    }
-    s_setup.wechat_entry = entry;
-    s_setup.wechat_intent = s_setup.wechat_configured
-        ? setup_wechat_success_intent()
-        : SETUP_WECHAT_INTENT_BIND_ACTIVE;
-    s_setup.wechat_phase = s_setup.wechat_configured
-        ? SETUP_WECHAT_SUCCESS : SETUP_WECHAT_BINDING;
-    setup_wechat_render();
-    if (!setup_push(SETUP_PAGE_WECHAT, true, now_us)) {
-        return;
-    }
-    /* Rebind after the page becomes current. The service model may already
-     * have published WAITING_SCAN while the preceding Wi-Fi page was active;
-     * the same payload must therefore be eligible for a fresh canvas push. */
-    s_setup.rendered_wechat_qr[0] = '\0';
-    s_setup.pending_wechat_qr[0] = '\0';
-    if (backend && !s_setup.wechat_configured && !status.active) {
-        (void)setup_wechat_start_service(false);
-    } else if (!backend && !s_setup.wechat_configured) {
-        setup_wechat_begin_simulation(now_us);
-    }
-    setup_wechat_apply_model(now_us);
 }
 
 static void setup_open_llm(int64_t now_us)
@@ -1687,11 +1276,6 @@ static void setup_handle_call(const mosaic_event_t *event)
     const int64_t now_us = event->timestamp_us;
     switch (action) {
     case GSP_ACT_ID_SETUP_CENTER_CLOSE:
-        if (s_setup.mode == MOSAIC_SETUP_MODE_ONBOARDING &&
-                s_setup.page == SETUP_PAGE_WECHAT) {
-            s_setup.onboarding_complete = true;
-            s_setup.wechat_skipped = !s_setup.wechat_configured;
-        }
         (void)setup_return_to_requester();
         break;
     case GSP_ACT_ID_SETUP_OVERVIEW_NETWORK:
@@ -1764,60 +1348,6 @@ static void setup_handle_call(const mosaic_event_t *event)
         if (s_setup.network_phase == SETUP_NETWORK_PASSWORD) {
             setup_network_cancel_password();
         } else if (s_setup.network_phase != SETUP_NETWORK_JOINING) {
-            setup_overview_render();
-            (void)setup_pop(s_setup.overview_page, now_us);
-        }
-        break;
-    case GSP_ACT_ID_SETUP_WECHAT_REBIND:
-        s_setup.wechat_intent = s_setup.wechat_configured
-            ? SETUP_WECHAT_INTENT_REBIND_ACTIVE
-            : SETUP_WECHAT_INTENT_BIND_ACTIVE;
-        s_setup.wechat_phase = SETUP_WECHAT_BINDING;
-        setup_wechat_render();
-        if (setup_wechat_has_backend()) {
-            const esp_err_t err = setup_wechat_start_service(
-                s_setup.wechat_configured);
-            if (err != ESP_OK && s_setup.wechat_configured) {
-                s_setup.wechat_intent = setup_wechat_success_intent();
-                s_setup.wechat_phase = SETUP_WECHAT_SUCCESS;
-                setup_wechat_render();
-            }
-        } else {
-            setup_wechat_begin_simulation(now_us);
-        }
-        break;
-    case GSP_ACT_ID_SETUP_WECHAT_CANCEL:
-        if (setup_return_to_requester()) {
-            setup_wechat_disarm_operation();
-            if (setup_wechat_has_backend()) {
-                setup_wechat_schedule_cancel();
-            }
-            break;
-        }
-        if (s_setup.wechat_phase == SETUP_WECHAT_BINDING ||
-                s_setup.wechat_phase == SETUP_WECHAT_PROGRESS) {
-            const bool backend = setup_wechat_has_backend();
-            setup_overview_render();
-            if (setup_pop(s_setup.overview_page, now_us)) {
-                /* Back leaves the WeChat route in one operation.  Disarm the
-                 * UI model before the asynchronous service cancellation can
-                 * publish CANCELLED (or one last WAITING_SCAN), otherwise the
-                 * old operation pulls the hidden page back into Binding. */
-                setup_wechat_disarm_operation();
-                if (backend) {
-                    /* Do not hold GSP's runtime lock while the service waits
-                     * on its worker/gateway cancellation path. */
-                    setup_wechat_schedule_cancel();
-                }
-            }
-        }
-        break;
-    case GSP_ACT_ID_SETUP_WECHAT_SUCCESS_BACK:
-        if (setup_return_to_requester()) {
-            break;
-        }
-        if (s_setup.wechat_phase == SETUP_WECHAT_SUCCESS &&
-                s_setup.wechat_entry == SETUP_WECHAT_ENTRY_APP) {
             setup_overview_render();
             (void)setup_pop(s_setup.overview_page, now_us);
         }
@@ -1915,15 +1445,8 @@ static uint8_t setup_operation_progress(int64_t now_us)
 
 static void setup_step(int64_t now_us)
 {
-    setup_wechat_apply_model(now_us);
     setup_network_apply_model(now_us);
     setup_region_step(now_us);
-    if (s_setup.page == SETUP_PAGE_WECHAT &&
-            s_setup.wechat_phase == SETUP_WECHAT_BINDING &&
-            now_us >= s_setup.navigation_guard_until_us &&
-            s_setup.pending_wechat_qr[0] != '\0') {
-        setup_wechat_push_qr(s_setup.pending_wechat_qr, now_us);
-    }
     if (s_setup.page == SETUP_PAGE_LLM &&
             (s_setup.llm_phase == SETUP_LLM_STATUS ||
              s_setup.llm_phase == SETUP_LLM_CONFIGURING) &&
@@ -2004,26 +1527,6 @@ static void setup_step(int64_t now_us)
         if (progress != s_setup.rendered_progress) {
             setup_progress_render(s_network_progress, progress);
         }
-    } else if (!setup_wechat_has_backend() &&
-            s_setup.wechat_flow.simulation &&
-            wechat_binding_flow_step(&s_setup.wechat_flow, now_us)) {
-        s_setup.wechat_phase = s_setup.wechat_flow.phase ==
-                WECHAT_BINDING_FLOW_SUCCESS
-            ? SETUP_WECHAT_SUCCESS
-            : (s_setup.wechat_flow.phase == WECHAT_BINDING_FLOW_PROGRESS
-                ? SETUP_WECHAT_PROGRESS : SETUP_WECHAT_BINDING);
-        setup_progress_render(
-            s_wechat_progress, s_setup.wechat_flow.progress);
-        (void)gsp_setup_center_setup_wechat_stage_text_set_text(
-            s_setup.ui, s_setup.wechat_flow.stage);
-        if (s_setup.wechat_flow.phase == WECHAT_BINDING_FLOW_SUCCESS) {
-            s_setup.wechat_intent = setup_wechat_success_intent();
-            s_setup.wechat_configured = true;
-            s_setup.wechat_skipped = false;
-            s_setup.onboarding_complete = true;
-        }
-        setup_wechat_render();
-        setup_overview_render();
     } else if (s_setup.llm_phase == SETUP_LLM_PROGRESS) {
         const uint8_t progress = setup_operation_progress(now_us);
         if (progress != s_setup.rendered_progress) {
@@ -2053,8 +1556,6 @@ static void setup_start(esp_gsp_handle_t ui, int64_t now_us)
     mosaic_setup_mode_t pending_mode = MOSAIC_SETUP_MODE_ONBOARDING;
     mosaic_setup_route_t pending_route = MOSAIC_SETUP_ROUTE_NETWORK;
     SETUP_MODEL_LOCK();
-    setup_wechat_event_queue_reset(&s_setup.wechat_events);
-    s_setup.wechat_stage_deadline_us = 0;
     s_setup.page = SETUP_PAGE_OVERVIEW;
     s_setup.overview_page = SETUP_PAGE_OVERVIEW;
     s_setup.ui = ui;
@@ -2070,18 +1571,9 @@ static void setup_start(esp_gsp_handle_t ui, int64_t now_us)
     s_setup.operation_deadline_us = 0;
     s_setup.rendered_network_revision = UINT32_MAX;
     s_setup.network_connect_pending = false;
-    s_setup.rendered_wechat_revision = UINT32_MAX;
-    s_setup.rendered_wechat_qr[0] = '\0';
-    s_setup.pending_wechat_qr[0] = '\0';
     s_setup.rendered_llm_qr[0] = '\0';
     s_setup.rendered_network_phone_qr[0] = '\0';
     s_setup.llm_config_url[0] = '\0';
-    s_setup.wechat_intent = SETUP_WECHAT_INTENT_VIEW_STATUS;
-    s_setup.wechat_entry = SETUP_WECHAT_ENTRY_APP;
-    s_setup.wechat_operation_revision = s_setup.wechat_revision;
-    if (setup_wechat_has_backend() && setup_qr_ensure_buffers() != ESP_OK) {
-        ESP_LOGE(TAG, "allocate WeChat QR buffers failed");
-    }
     if (mosaic_settings_wifi_backend_available()) {
         const esp_err_t err = mosaic_settings_subscribe_wifi(
             setup_network_event, NULL);
@@ -2109,15 +1601,10 @@ static void setup_start(esp_gsp_handle_t ui, int64_t now_us)
     (void)setup_llm_refresh_model(false);
     setup_overview_render();
     setup_network_render();
-    setup_wechat_render();
     setup_llm_render();
-    setup_wechat_apply_model(now_us);
     switch (s_setup.route) {
     case MOSAIC_SETUP_ROUTE_NETWORK:
         setup_open_network(now_us);
-        break;
-    case MOSAIC_SETUP_ROUTE_WECHAT:
-        setup_open_llm(now_us);
         break;
     case MOSAIC_SETUP_ROUTE_LLM:
         setup_open_llm(now_us);
@@ -2144,7 +1631,6 @@ static void setup_center_event(
     case MOSAIC_EVENT_STOP:
         setup_password_detach();
         setup_network_list_park();
-        (void)esp_gsp_canvas_stop(ui, GSP_BIND_SETUP_WECHAT_QR_CANVAS);
         (void)esp_gsp_canvas_stop(ui, GSP_BIND_SETUP_LLM_CONFIG_QR_CANVAS);
         (void)esp_gsp_canvas_stop(
             ui, GSP_BIND_SETUP_NETWORK_PHONE_QR_CANVAS);
@@ -2155,12 +1641,6 @@ static void setup_center_event(
         } else if (!setup_qr_free_buffers()) {
             ESP_LOGW(TAG, "QR buffers still busy after shutdown flush");
         }
-        if (setup_wechat_has_backend() &&
-                (s_setup.wechat_phase == SETUP_WECHAT_BINDING ||
-                 s_setup.wechat_phase == SETUP_WECHAT_PROGRESS)) {
-            setup_wechat_disarm_operation();
-            setup_wechat_schedule_cancel();
-        }
         mosaic_top_notice_detach(ui);
         if (s_setup.wifi_subscribed) {
             (void)mosaic_settings_unsubscribe_wifi(
@@ -2169,8 +1649,6 @@ static void setup_center_event(
         }
         s_setup.network_list = ESP_GSP_LIST_NONE;
         SETUP_MODEL_LOCK();
-        setup_wechat_event_queue_reset(&s_setup.wechat_events);
-        s_setup.wechat_stage_deadline_us = 0;
         s_setup.ui = NULL;
         SETUP_MODEL_UNLOCK();
         break;

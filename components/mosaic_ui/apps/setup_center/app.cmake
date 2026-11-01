@@ -1,6 +1,5 @@
 set(MOSAIC_APP_NAME setup_center)
 set(MOSAIC_APP_MODULE_SOURCE setup_center_app.c)
-set(MOSAIC_APP_EXTRA_SOURCES setup_center_wechat_queue.c)
 set(MOSAIC_APP_MODULE_SYMBOL mosaic_setup_center_app)
 set(MOSAIC_APP_BUNDLE generated/setup_center.gspb)
 set(MOSAIC_APP_SCENE_DIR scene)
