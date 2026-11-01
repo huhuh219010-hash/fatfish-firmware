@@ -36,8 +36,7 @@
 #endif
 #include "cap_llm_config.h"
 #if CONFIG_APP_CLAW_CAP_LUA
-#include "cap_app_mgr.h"
-#include "cap_lua.h"
+#include "fatfish_runtime.h"
 #endif
 #if CONFIG_APP_CLAW_CAP_MCP_CLIENT
 #include "cap_mcp_client.h"
@@ -602,8 +601,7 @@ static esp_err_t app_cap_register_lua(const app_claw_config_t *config,
 {
     (void)config;
     (void)paths;
-    ESP_RETURN_ON_ERROR(cap_lua_register_group(), TAG, "Failed to register Lua group");
-    return cap_app_mgr_register_group();
+    return fatfish_runtime_lua_register_capabilities();
 }
 #endif
 
@@ -886,7 +884,13 @@ esp_err_t app_capabilities_init(const app_claw_config_t *config,
         return ESP_ERR_INVALID_ARG;
     }
 
+#if CONFIG_APP_CLAW_CAP_LUA
+    ESP_RETURN_ON_FALSE(fatfish_runtime_lua_is_initialized(),
+                        ESP_ERR_INVALID_STATE, TAG,
+                        "Fatfish Lua runtime is not initialized");
+#else
     ESP_RETURN_ON_ERROR(claw_cap_init(), TAG, "Failed to init claw_cap");
+#endif
     ESP_GOTO_ON_ERROR(app_cap_register_llm_config_command(),
                       cleanup, TAG, "Failed to register LLM config command");
 

@@ -1,4 +1,15 @@
 dependencies:
+  app_registry:
+    path: ../../third-party/esp-claw/components/common/app_registry
+
+  cap_app_mgr:
+    rules:
+      - if: $CONFIG{APP_CLAW_CAP_LUA} == True
+    path: ../../third-party/esp-claw/components/claw_capabilities/cap_app_mgr
+
+  claw_cap:
+    path: ../../third-party/esp-claw/components/claw_modules/claw_cap
+
   claw_hw_registry:
     path: ../../third-party/esp-claw/components/common/claw_hw_registry
 

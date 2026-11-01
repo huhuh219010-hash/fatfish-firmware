@@ -84,6 +84,8 @@ typedef struct {
     const char *enabled_modules;
 } fatfish_runtime_lua_config_t;
 
+typedef void (*fatfish_runtime_app_registry_changed_cb_t)(void *user_ctx);
+
 /** @brief Start the singleton runtime and its command worker. */
 esp_err_t fatfish_runtime_init(const fatfish_runtime_config_t *config);
 
@@ -92,6 +94,13 @@ esp_err_t fatfish_runtime_lua_init(
     const fatfish_runtime_lua_config_t *config);
 
 bool fatfish_runtime_lua_is_initialized(void);
+
+/** @brief Register the Lua and App management capability groups. */
+esp_err_t fatfish_runtime_lua_register_capabilities(void);
+
+/** @brief Subscribe a UI refresh callback to App registry changes. */
+esp_err_t fatfish_runtime_lua_register_app_changed_cb(
+    fatfish_runtime_app_registry_changed_cb_t callback, void *user_ctx);
 
 /** @brief Stop the worker and release runtime resources. */
 esp_err_t fatfish_runtime_deinit(void);

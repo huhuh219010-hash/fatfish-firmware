@@ -6,6 +6,7 @@
 #include "app_claw.h"
 #include "app_capabilities.h"
 #include "audio_hub.h"
+#include "fatfish_runtime.h"
 #if CONFIG_APP_CLAW_SYSTEM_UI_ENABLE
 #include "system_ui.h"
 #endif
@@ -41,15 +42,12 @@
 #if CONFIG_APP_CLAW_CAP_SKILL_MGR
 #include "claw_skill.h"
 #endif
-#if CONFIG_APP_CLAW_CAP_LUA
-#include "app_registry.h"
-#endif
 #include "esp_check.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
-#if CONFIG_APP_CLAW_CAP_LUA
+#if CONFIG_APP_CLAW_SYSTEM_UI_ENABLE && CONFIG_APP_CLAW_CAP_LUA
 #include "cap_lua.h"
 #endif
 
@@ -583,6 +581,10 @@ static esp_err_t app_claw_delete_session_history(const char *session_id,
 }
 #endif
 
+#if CONFIG_APP_CLAW_SYSTEM_UI_ENABLE && CONFIG_APP_CLAW_CAP_LUA
+static void app_claw_registry_changed_cb(void *user_ctx);
+#endif
+
 esp_err_t app_claw_ui_start(void)
 {
 #if CONFIG_APP_CLAW_SYSTEM_UI_ENABLE
@@ -598,6 +600,10 @@ esp_err_t app_claw_ui_start(void)
     ESP_RETURN_ON_ERROR(system_ui_set_callbacks(&callbacks, NULL), TAG, "set system UI callbacks failed");
     ESP_RETURN_ON_ERROR(cap_lua_register_job_event_cb(app_claw_lua_job_event_cb, NULL),
                         TAG, "register Lua job event callback failed");
+    ESP_RETURN_ON_ERROR(
+        fatfish_runtime_lua_register_app_changed_cb(
+            app_claw_registry_changed_cb, NULL),
+        TAG, "register App listener failed");
 #endif
     return ESP_OK;
 #else
@@ -693,19 +699,6 @@ static esp_err_t init_skills(const app_claw_storage_paths_t *paths)
     ESP_RETURN_ON_ERROR(claw_skill_add_directory(paths->skills_root_dir), TAG, "Failed to add skills directory");
     ESP_RETURN_ON_ERROR(claw_skill_add_directory(paths->system_skills_root_dir), TAG, "Failed to add system skills directory");
     return claw_skill_reload_registry();
-}
-#endif
-
-#if CONFIG_APP_CLAW_CAP_LUA
-static esp_err_t init_apps(const app_claw_storage_paths_t *paths)
-{
-    ESP_RETURN_ON_ERROR(app_registry_init(), TAG, "Failed to init App registry");
-    ESP_RETURN_ON_ERROR(app_registry_add_directory(paths->apps_root_dir), TAG, "Failed to add writable App directory");
-    ESP_RETURN_ON_ERROR(app_registry_add_directory(paths->system_apps_root_dir), TAG, "Failed to add system App directory");
-#if CONFIG_APP_CLAW_SYSTEM_UI_ENABLE
-    ESP_RETURN_ON_ERROR(app_registry_register_changed_cb(app_claw_registry_changed_cb, NULL), TAG, "Failed to register App listener");
-#endif
-    return app_registry_reload();
 }
 #endif
 
@@ -886,9 +879,6 @@ esp_err_t app_claw_start(const app_claw_config_t *config, claw_hw_registry_handl
 #endif
 #if CONFIG_APP_CLAW_CAP_SKILL_MGR
     ESP_RETURN_ON_ERROR(init_skills(&paths), TAG, "Failed to init skills");
-#endif
-#if CONFIG_APP_CLAW_CAP_LUA
-    ESP_RETURN_ON_ERROR(init_apps(&paths), TAG, "Failed to init Apps");
 #endif
     ESP_RETURN_ON_ERROR(app_capabilities_init(config, &paths), TAG, "Failed to init capabilities");
 #if CONFIG_APP_CLAW_CAP_IM_QQ

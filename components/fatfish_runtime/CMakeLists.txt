@@ -7,7 +7,10 @@ idf_component_register(
     INCLUDE_DIRS
         "include"
     REQUIRES
+        app_registry
+        cap_app_mgr
         cap_lua
+        claw_cap
         claw_hw_registry
         mosaico_camera_service
     PRIV_REQUIRES
