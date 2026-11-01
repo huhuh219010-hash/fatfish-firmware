@@ -647,63 +647,6 @@ esp_err_t app_config_validate_wifi(const app_config_t *config, const char **mess
     return ESP_OK;
 }
 
-void app_config_to_claw(const app_config_t *config, app_claw_config_t *out)
-{
-    if (!config || !out) {
-        return;
-    }
-
-    memset(out, 0, sizeof(*out));
-
-    strlcpy(out->llm_api_key, config->llm_api_key, sizeof(out->llm_api_key));
-    strlcpy(out->llm_backend_type, config->llm_backend_type, sizeof(out->llm_backend_type));
-    strlcpy(out->llm_endpoint_provider, config->llm_endpoint_provider, sizeof(out->llm_endpoint_provider));
-    strlcpy(out->llm_model, config->llm_model, sizeof(out->llm_model));
-    strlcpy(out->llm_base_url, config->llm_base_url, sizeof(out->llm_base_url));
-    strlcpy(out->llm_auth_type, config->llm_auth_type, sizeof(out->llm_auth_type));
-    strlcpy(out->llm_timeout_ms, config->llm_timeout_ms, sizeof(out->llm_timeout_ms));
-    strlcpy(out->llm_max_tokens, config->llm_max_tokens, sizeof(out->llm_max_tokens));
-    strlcpy(out->llm_default_image_max_bytes,
-            config->llm_default_image_max_bytes,
-            sizeof(out->llm_default_image_max_bytes));
-    strlcpy(out->llm_max_tokens_field, config->llm_max_tokens_field, sizeof(out->llm_max_tokens_field));
-    strlcpy(out->llm_reasoning_effort, config->llm_reasoning_effort, sizeof(out->llm_reasoning_effort));
-    strlcpy(out->llm_supports_tools, config->llm_supports_tools, sizeof(out->llm_supports_tools));
-    strlcpy(out->llm_supports_vision, config->llm_supports_vision, sizeof(out->llm_supports_vision));
-    strlcpy(out->llm_image_remote_url_only,
-            config->llm_image_remote_url_only,
-            sizeof(out->llm_image_remote_url_only));
-    strlcpy(out->qq_app_id, config->qq_app_id, sizeof(out->qq_app_id));
-    strlcpy(out->qq_app_secret, config->qq_app_secret, sizeof(out->qq_app_secret));
-    strlcpy(out->qq_msg_type, config->qq_msg_type, sizeof(out->qq_msg_type));
-    strlcpy(out->feishu_app_id, config->feishu_app_id, sizeof(out->feishu_app_id));
-    strlcpy(out->feishu_app_secret, config->feishu_app_secret, sizeof(out->feishu_app_secret));
-    strlcpy(out->tg_bot_token, config->tg_bot_token, sizeof(out->tg_bot_token));
-    strlcpy(out->wechat_token, config->wechat_token, sizeof(out->wechat_token));
-    strlcpy(out->wechat_base_url, config->wechat_base_url, sizeof(out->wechat_base_url));
-    strlcpy(out->wechat_cdn_base_url, config->wechat_cdn_base_url, sizeof(out->wechat_cdn_base_url));
-    strlcpy(out->wechat_account_id, config->wechat_account_id, sizeof(out->wechat_account_id));
-    strlcpy(out->search_brave_key, config->search_brave_key, sizeof(out->search_brave_key));
-    strlcpy(out->search_provider, config->search_provider, sizeof(out->search_provider));
-    strlcpy(out->search_bocha_key, config->search_bocha_key, sizeof(out->search_bocha_key));
-    strlcpy(out->search_tavily_key, config->search_tavily_key, sizeof(out->search_tavily_key));
-    strlcpy(out->search_http_allowlist,
-            config->search_http_allowlist,
-            sizeof(out->search_http_allowlist));
-    strlcpy(out->asr_provider, config->asr_provider, sizeof(out->asr_provider));
-    strlcpy(out->asr_endpoint_provider, config->asr_endpoint_provider, sizeof(out->asr_endpoint_provider));
-    strlcpy(out->asr_api_key, config->asr_api_key, sizeof(out->asr_api_key));
-    strlcpy(out->asr_workspace_id, config->asr_workspace_id,
-            sizeof(out->asr_workspace_id));
-    strlcpy(out->asr_language_hint, config->asr_language_hint,
-            sizeof(out->asr_language_hint));
-    strlcpy(out->asr_model, config->asr_model, sizeof(out->asr_model));
-    strlcpy(out->asr_endpoint, config->asr_endpoint, sizeof(out->asr_endpoint));
-    strlcpy(out->enabled_cap_groups, config->enabled_cap_groups, sizeof(out->enabled_cap_groups));
-    strlcpy(out->llm_visible_cap_groups, config->llm_visible_cap_groups, sizeof(out->llm_visible_cap_groups));
-    strlcpy(out->enabled_lua_modules, config->enabled_lua_modules, sizeof(out->enabled_lua_modules));
-}
-
 const char *app_config_get_timezone(const app_config_t *config)
 {
     return config ? config->time_timezone : NULL;

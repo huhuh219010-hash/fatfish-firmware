@@ -5,17 +5,17 @@
  */
 #include "http_server_priv.h"
 
-#include "app_capabilities.h"
+#include "fatfish_runtime.h"
 
 static esp_err_t capabilities_get_handler(httpd_req_t *req)
 {
-    const app_capability_group_info_t *groups = NULL;
+    const fatfish_runtime_capability_info_t *groups = NULL;
     size_t group_count = 0;
     cJSON *root = NULL;
     cJSON *items = NULL;
     esp_err_t err;
 
-    err = app_capabilities_get_compiled_groups(&groups, &group_count);
+    err = fatfish_runtime_get_compiled_capabilities(&groups, &group_count);
     if (err != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to load capabilities");
     }
@@ -40,7 +40,7 @@ static esp_err_t capabilities_get_handler(httpd_req_t *req)
 
         http_server_json_add_string(item, "group_id", groups[i].group_id);
         http_server_json_add_string(item, "display_name", groups[i].display_name);
-        cJSON_AddBoolToObject(item, "default_llm_visible", groups[i].llm_visible_by_default);
+        cJSON_AddBoolToObject(item, "default_llm_visible", groups[i].default_visible);
         cJSON_AddItemToArray(items, item);
     }
 

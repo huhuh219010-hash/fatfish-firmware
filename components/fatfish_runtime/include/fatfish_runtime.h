@@ -82,7 +82,15 @@ typedef struct {
 typedef struct {
     claw_hw_registry_handle_t hardware_registry;
     const char *enabled_modules;
+    bool (*network_ready)(void *user_ctx);
+    void *network_ready_user_ctx;
 } fatfish_runtime_lua_config_t;
+
+typedef struct {
+    const char *group_id;
+    const char *display_name;
+    bool default_visible;
+} fatfish_runtime_capability_info_t;
 
 typedef void (*fatfish_runtime_app_registry_changed_cb_t)(void *user_ctx);
 
@@ -94,9 +102,6 @@ esp_err_t fatfish_runtime_lua_init(
     const fatfish_runtime_lua_config_t *config);
 
 bool fatfish_runtime_lua_is_initialized(void);
-
-/** @brief Register the Lua and App management capability groups. */
-esp_err_t fatfish_runtime_lua_register_capabilities(void);
 
 /** @brief Subscribe a UI refresh callback to App registry changes. */
 esp_err_t fatfish_runtime_lua_register_app_changed_cb(
@@ -122,6 +127,10 @@ esp_err_t fatfish_runtime_unsubscribe(
     fatfish_runtime_event_callback_t event_callback, void *user_ctx);
 
 bool fatfish_runtime_is_initialized(void);
+
+/** @brief Return capability groups retained by the product runtime. */
+esp_err_t fatfish_runtime_get_compiled_capabilities(
+    const fatfish_runtime_capability_info_t **groups, size_t *count);
 
 #ifdef __cplusplus
 }

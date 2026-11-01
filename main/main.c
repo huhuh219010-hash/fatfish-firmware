@@ -3,16 +3,13 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "app_claw.h"
-#include "app_claw_hw_bridge.h"
-#include "app_capabilities.h"
 #include "app_settings_service.h"
 #include "display_service.h"
 #include "app_fs.h"
 #include "app_factory_reset.h"
 #include "app_recovery.h"
-#include "claw_version.h"
 #include "fatfish_paths.h"
+#include "fatfish_hw_bridge.h"
 #include "edge_agent_version.h"
 #include <string.h>
 #include <stdlib.h>
@@ -58,16 +55,15 @@
 #endif
 
 #define APP_ENABLE_MEM_LOG        (0)
-#define APP_ENABLE_CLAW_TASKS     (1)
+#define APP_ENABLE_BACKGROUND_SERVICES (1)
 #define APP_WEATHER_USER_AGENT \
-    "esp-mosaico-claw/1.0 https://github.com/espressif/esp-claw"
+    "fatfish-firmware/1.0"
 #define APP_REGION_REFRESH_TIMEOUT_MS 30000U
 
 static const char *TAG = "app";
 
 static claw_hw_registry_handle_t s_hw_registry;
 static EXT_RAM_BSS_ATTR app_config_t *s_config;
-static EXT_RAM_BSS_ATTR app_claw_config_t *s_claw_config;
 static EXT_RAM_BSS_ATTR app_settings_service_handle_t s_app_settings;
 static region_service_handle_t s_region_service;
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
@@ -85,11 +81,7 @@ static esp_err_t app_allocate_runtime_state(void)
     if (!s_config) {
         s_config = calloc(1, sizeof(*s_config));
     }
-    if (!s_claw_config) {
-        s_claw_config = calloc(1, sizeof(*s_claw_config));
-    }
-
-    ESP_RETURN_ON_FALSE(s_config && s_claw_config, ESP_ERR_NO_MEM, TAG,
+    ESP_RETURN_ON_FALSE(s_config, ESP_ERR_NO_MEM, TAG,
                         "Failed to allocate runtime state");
 
     return ESP_OK;
@@ -97,9 +89,6 @@ static esp_err_t app_allocate_runtime_state(void)
 
 static void app_free_runtime_state(void)
 {
-    free(s_claw_config);
-    s_claw_config = NULL;
-
     free(s_config);
     s_config = NULL;
 }
@@ -196,10 +185,6 @@ static void on_wifi_state_changed(bool connected, void *user_ctx)
              status.mode ? status.mode : "off",
              ap_ssid ? ap_ssid : "(none)");
 
-    esp_err_t err = app_claw_set_network_status(connected, ap_ssid);
-    if (err != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to update network UI: %s", esp_err_to_name(err));
-    }
 }
 #endif
 
@@ -226,7 +211,6 @@ static esp_err_t main_save_config_internal(
     const app_config_t *config, bool apply_wifi)
 {
     esp_err_t err;
-    app_claw_config_t *claw_config = NULL;
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     app_config_t *previous_config = NULL;
     bool wifi_changed = true;
@@ -250,17 +234,6 @@ static esp_err_t main_save_config_internal(
         return err;
     }
 
-    claw_config = calloc(1, sizeof(*claw_config));
-    if (!claw_config) {
-        ESP_LOGW(TAG, "Failed to allocate Claw config for runtime update");
-        return ESP_OK;
-    }
-    app_config_to_claw(config, claw_config);
-    err = app_claw_update_config(claw_config);
-    free(claw_config);
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-        ESP_LOGW(TAG, "Failed to update running Claw config: %s", esp_err_to_name(err));
-    }
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     if (apply_wifi && wifi_changed && s_network_provisioning != NULL) {
         err = network_provisioning_service_reload_and_apply(
@@ -283,51 +256,6 @@ static esp_err_t main_save_config(const app_config_t *config)
 static esp_err_t main_save_web_config(const app_config_t *config)
 {
     return main_save_config_internal(config, false);
-}
-
-static void main_copy_claw_to_app_config(const app_claw_config_t *src, app_config_t *dst)
-{
-    strlcpy(dst->llm_api_key, src->llm_api_key, sizeof(dst->llm_api_key));
-    strlcpy(dst->llm_backend_type, src->llm_backend_type, sizeof(dst->llm_backend_type));
-    strlcpy(dst->llm_endpoint_provider, src->llm_endpoint_provider, sizeof(dst->llm_endpoint_provider));
-    strlcpy(dst->llm_model, src->llm_model, sizeof(dst->llm_model));
-    strlcpy(dst->llm_base_url, src->llm_base_url, sizeof(dst->llm_base_url));
-    strlcpy(dst->llm_auth_type, src->llm_auth_type, sizeof(dst->llm_auth_type));
-    strlcpy(dst->llm_timeout_ms, src->llm_timeout_ms, sizeof(dst->llm_timeout_ms));
-    strlcpy(dst->llm_max_tokens, src->llm_max_tokens, sizeof(dst->llm_max_tokens));
-    strlcpy(dst->llm_default_image_max_bytes,
-            src->llm_default_image_max_bytes,
-            sizeof(dst->llm_default_image_max_bytes));
-    strlcpy(dst->llm_max_tokens_field, src->llm_max_tokens_field, sizeof(dst->llm_max_tokens_field));
-    strlcpy(dst->llm_reasoning_effort, src->llm_reasoning_effort, sizeof(dst->llm_reasoning_effort));
-    strlcpy(dst->llm_supports_tools, src->llm_supports_tools, sizeof(dst->llm_supports_tools));
-    strlcpy(dst->llm_supports_vision, src->llm_supports_vision, sizeof(dst->llm_supports_vision));
-    strlcpy(dst->llm_image_remote_url_only,
-            src->llm_image_remote_url_only,
-            sizeof(dst->llm_image_remote_url_only));
-}
-
-static esp_err_t main_save_claw_config(const app_claw_config_t *config, void *user_ctx)
-{
-    esp_err_t err;
-    app_config_t *app_config = NULL;
-
-    (void)user_ctx;
-    ESP_RETURN_ON_FALSE(config, ESP_ERR_INVALID_ARG, TAG, "config is NULL");
-
-    app_config = calloc(1, sizeof(*app_config));
-    ESP_RETURN_ON_FALSE(app_config, ESP_ERR_NO_MEM, TAG, "Failed to allocate app config for Claw save");
-
-    err = app_config_load(app_config);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to load config for Claw save: %s", esp_err_to_name(err));
-        free(app_config);
-        return err;
-    }
-    main_copy_claw_to_app_config(config, app_config);
-    err = app_config_save(app_config);
-    free(app_config);
-    return err;
 }
 
 static esp_err_t main_get_wifi_status(http_server_wifi_status_t *status)
@@ -599,21 +527,21 @@ static esp_err_t main_start_fatfish_lua(void)
 {
     return fatfish_runtime_lua_init(&(fatfish_runtime_lua_config_t) {
         .hardware_registry = s_hw_registry,
-        .enabled_modules = s_claw_config->enabled_lua_modules,
+        .enabled_modules = s_config->enabled_lua_modules,
+        .network_ready = main_network_ready,
+        .network_ready_user_ctx = NULL,
     });
 }
 
 void app_main(void)
 {
-#if defined(ESP_MOSAICO_REMOTE_DEBUG) && APP_ENABLE_CLAW_TASKS
+#if defined(ESP_MOSAICO_REMOTE_DEBUG) && APP_ENABLE_BACKGROUND_SERVICES
     (void)esp_remote_mosaic_adapter_start();
 #endif
     esp_log_level_set("esp-x509-crt-bundle", ESP_LOG_WARN);
     esp_log_level_set("http_reuse", ESP_LOG_WARN);
 
     ESP_LOGI(TAG, "Starting app");
-    ESP_LOGI(TAG, "ESP-Claw version: %s", claw_get_version());
-    ESP_LOGI(TAG, "ESP-Claw git version: %s", claw_get_git_version());
     ESP_LOGI(TAG, "Edge Agent version: %s", edge_agent_get_version());
     ESP_ERROR_CHECK(app_allocate_runtime_state());
     ESP_ERROR_CHECK(init_nvs());
@@ -626,11 +554,10 @@ void app_main(void)
         ESP_ERROR_CHECK(app_config_reset_all());
     }
     ESP_ERROR_CHECK(app_config_load(s_config));
-    app_config_to_claw(s_config, s_claw_config);
     init_timezone(app_config_get_timezone(s_config)); // no need to check error
     /* BSP setup initializes the custom I2C provider through Board Manager. */
     ESP_ERROR_CHECK(claw_hw_registry_create(&s_hw_registry));
-    ESP_ERROR_CHECK(app_claw_hw_bridge_init(s_hw_registry));
+    ESP_ERROR_CHECK(fatfish_hw_bridge_init(s_hw_registry));
 #if CONFIG_ESP_BOARD_ESP_MOSAICO
     ESP_ERROR_CHECK(mosaico_bsp_bmgr_init());
     ESP_ERROR_CHECK(trial_provider_validate_hmac_efuse_key());
@@ -680,7 +607,7 @@ void app_main(void)
         .refresh_interval_ms = 60U * 60U * 1000U,
         .stale_after_ms = 6U * 60U * 60U * 1000U,
     }));
-    if (APP_ENABLE_CLAW_TASKS) {
+    if (APP_ENABLE_BACKGROUND_SERVICES) {
         ESP_ERROR_CHECK(network_provisioning_service_create(
             &s_network_provisioning));
         ESP_ERROR_CHECK(network_provisioning_service_register_cb(
@@ -709,7 +636,6 @@ void app_main(void)
 #endif
 
 #if !CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
-    ESP_ERROR_CHECK(app_claw_ui_start());
     main_restore_display_rotation();
     main_restore_display_brightness();
 #else
@@ -721,10 +647,10 @@ void app_main(void)
     ESP_ERROR_CHECK(mosaic_ui_start());
 #endif
 
-    if (!APP_ENABLE_CLAW_TASKS) {
+    if (!APP_ENABLE_BACKGROUND_SERVICES) {
         ESP_LOGW(TAG,
-                 "Claw background services disabled: Wi-Fi, network, HTTP, "
-                 "bindings, audio/ASR, capabilities, and agent not started");
+                 "Background services disabled: Wi-Fi, network, HTTP, "
+                 "audio, Lua, and capabilities not started");
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
         ESP_ERROR_CHECK(mosaico_camera_service_init());
         ESP_ERROR_CHECK(main_start_fatfish_runtime());
@@ -835,8 +761,6 @@ void app_main(void)
     }
 
     ESP_ERROR_CHECK(app_cap_system_platform_init(s_app_settings));
-    ESP_ERROR_CHECK(app_claw_set_save_config_callback(main_save_claw_config, NULL));
-    ESP_ERROR_CHECK(app_claw_set_network_ready_callback(main_network_ready, NULL));
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     ESP_ERROR_CHECK(mosaico_camera_service_init());
     ESP_ERROR_CHECK(main_start_fatfish_runtime());
@@ -851,14 +775,13 @@ void app_main(void)
 #endif
     esp_err_t recovery_err = app_fs_wait_recovery();
     if (recovery_err != ESP_OK) {
-        ESP_LOGW(TAG, "DATA recovery incomplete before Claw start: %s", esp_err_to_name(recovery_err));
+        ESP_LOGW(TAG, "DATA recovery incomplete before runtime start: %s", esp_err_to_name(recovery_err));
     }
 #if CONFIG_ESP_BOARD_ESP_MOSAICO && CONFIG_ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT
     ESP_ERROR_CHECK(esp_board_manager_init_device_by_name(ESP_BOARD_DEVICE_NAME_AUDIO_DAC));
     ESP_ERROR_CHECK(esp_board_manager_init_device_by_name(ESP_BOARD_DEVICE_NAME_AUDIO_ADC));
 #endif
     ESP_ERROR_CHECK(main_start_fatfish_lua());
-    ESP_ERROR_CHECK(app_claw_start(s_claw_config, s_hw_registry));
 #if CONFIG_APP_CLAW_MOSAIC_GSP_ENABLE
     ESP_ERROR_CHECK(weather_service_start());
 #endif

@@ -5,7 +5,6 @@
  */
 #pragma once
 
-#include "app_claw.h"
 #include "esp_err.h"
 
 #ifdef __cplusplus
@@ -74,7 +73,6 @@ esp_err_t app_config_save(const app_config_t *config);
 /** Erase every local value in the shared app namespace. */
 esp_err_t app_config_reset_all(void);
 esp_err_t app_config_validate_wifi(const app_config_t *config, const char **message);
-void app_config_to_claw(const app_config_t *config, app_claw_config_t *out);
 const char *app_config_get_timezone(const app_config_t *config);
 
 #ifdef __cplusplus

@@ -1,0 +1,208 @@
+menu "Fatfish Runtime"
+
+    config APP_CLAW_SYSTEM_UI_ENABLE
+        bool
+        default n
+
+    config APP_CLAW_MAX_TOOL_ITERATIONS
+        int
+        default 64
+        range 1 1024
+
+    # Compatibility switches consumed by retained upstream Lua/capability
+    # components. Agent, IM, router, memory, scheduler, MCP, and skill-manager
+    # runtimes are intentionally fixed off in the Fatfish product runtime.
+    config APP_CLAW_CAP_FILES
+        bool
+        default n
+    config APP_CLAW_CAP_MEMORY
+        bool
+        default n
+    config APP_CLAW_CAP_EVENT_ROUTER
+        bool
+        default n
+    config APP_CLAW_CAP_CORE
+        bool
+        default n
+    config APP_CLAW_CAP_IM_QQ
+        bool
+        default n
+    config APP_CLAW_CAP_IM_FEISHU
+        bool
+        default n
+    config APP_CLAW_CAP_IM_TG
+        bool
+        default n
+    config APP_CLAW_CAP_IM_WECHAT
+        bool
+        default n
+    config APP_CLAW_CAP_IM_LOCAL
+        bool
+        default n
+    config APP_CLAW_CAP_SCHEDULER
+        bool
+        default n
+    config APP_CLAW_CAP_MCP_CLIENT
+        bool
+        default n
+    config APP_CLAW_CAP_MCP_SERVER
+        bool
+        default n
+    config APP_CLAW_CAP_SKILL_MGR
+        bool
+        default n
+    config APP_CLAW_CAP_LLM_INSPECT
+        bool
+        default n
+    config APP_CLAW_CAP_HTTP_REQUEST
+        bool
+        default n
+    config APP_CLAW_CAP_WEB_SEARCH
+        bool
+        default n
+    config APP_CLAW_CAP_ROUTER_MGR
+        bool
+        default n
+    config APP_CLAW_CAP_SESSION_MGR
+        bool
+        default n
+    config APP_CLAW_CAP_AGENT_MGR
+        bool
+        default n
+
+    config APP_CLAW_CAP_LUA
+        bool
+        default y
+
+    config APP_CLAW_CAP_SYSTEM
+        bool
+        default y
+
+    menu "Lua hardware drivers"
+        depends on APP_CLAW_CAP_LUA
+
+        config APP_CLAW_LUA_DRIVER_ADC
+            bool "ADC"
+            default y
+        config APP_CLAW_LUA_DRIVER_GPIO
+            bool "GPIO"
+            default y
+        config APP_CLAW_LUA_DRIVER_I2C
+            bool "I2C"
+            default y
+        config APP_CLAW_LUA_DRIVER_MCPWM
+            bool "MCPWM"
+            default y
+        config APP_CLAW_LUA_DRIVER_PCNT
+            bool "PCNT"
+            default y if SOC_PCNT_SUPPORTED
+            default n
+        config APP_CLAW_LUA_DRIVER_RMT
+            bool "RMT"
+            default y if SOC_RMT_SUPPORTED
+            default n
+        config APP_CLAW_LUA_DRIVER_TOUCH
+            bool "Touch"
+            default y if SOC_TOUCH_SENSOR_SUPPORTED
+            default n
+        config APP_CLAW_LUA_DRIVER_UART
+            bool "UART"
+            default y
+        config APP_CLAW_LUA_DRIVER_LEDC
+            bool "LEDC"
+            default y
+    endmenu
+
+    menu "Lua capability modules"
+        depends on APP_CLAW_CAP_LUA
+
+        config APP_CLAW_LUA_MODULE_AUDIO
+            bool "Audio"
+            default y if ESP_BOARD_DEV_AUDIO_CODEC_SUPPORT
+            default n
+        config APP_CLAW_LUA_MODULE_BOARD_MANAGER
+            bool "Board Manager"
+            default y
+        config APP_CLAW_LUA_MODULE_BUTTON
+            bool "Button"
+            default y
+        config APP_CLAW_LUA_MODULE_BLE
+            bool "BLE"
+            default n
+        config APP_CLAW_LUA_MODULE_BLE_HID
+            bool "BLE HID"
+            default n
+            select BT_NIMBLE_HID_SERVICE
+        config APP_CLAW_LUA_MODULE_CAMERA
+            bool "Camera"
+            default y if ESP_BOARD_DEV_CAMERA_SUPPORT
+            default n
+        config APP_CLAW_LUA_MODULE_CAPABILITY
+            bool "Capability calls"
+            default y
+        config APP_CLAW_LUA_MODULE_DELAY
+            bool "Delay"
+            default y
+        config APP_CLAW_LUA_MODULE_DISPLAY
+            bool "Display"
+            default y
+        config APP_CLAW_LUA_MODULE_ENVIRONMENTAL_SENSOR
+            bool "Environmental sensor"
+            default n
+            select APP_CLAW_LUA_DRIVER_I2C if LUA_MODULE_ENVIRONMENTAL_SENSOR_BACKEND_BME690
+        config APP_CLAW_LUA_MODULE_EVENT_PUBLISHER
+            bool "Event publisher"
+            default y
+        config APP_CLAW_LUA_MODULE_HTTP_SERVER
+            bool "HTTP server"
+            default y
+        config APP_CLAW_LUA_MODULE_JSON
+            bool "JSON"
+            default y
+        config APP_CLAW_LUA_MODULE_THREAD
+            bool "Thread"
+            default y
+        config APP_CLAW_LUA_MODULE_FUEL_GAUGE
+            bool "Fuel gauge"
+            default n
+        config APP_CLAW_LUA_MODULE_IMAGE
+            bool "Image"
+            default y
+        config APP_CLAW_LUA_MODULE_IMU
+            bool "IMU"
+            default n
+        config APP_CLAW_LUA_MODULE_IR
+            bool "IR"
+            default n
+        config APP_CLAW_LUA_MODULE_KNOB
+            bool "Knob"
+            default n
+        config APP_CLAW_LUA_MODULE_LCD
+            bool "LCD"
+            default n
+        config APP_CLAW_LUA_MODULE_LED_STRIP
+            bool "LED strip"
+            default y
+        config APP_CLAW_LUA_MODULE_LVGL
+            bool "LVGL"
+            default y
+        config APP_CLAW_LUA_MODULE_MAGNETOMETER
+            bool "Magnetometer"
+            default n
+        config APP_CLAW_LUA_MODULE_SCI
+            bool "DFRobot SCI"
+            default n
+            select APP_CLAW_LUA_DRIVER_I2C
+        config APP_CLAW_LUA_MODULE_STORAGE
+            bool "Storage"
+            default y
+        config APP_CLAW_LUA_MODULE_SYSTEM
+            bool "System"
+            default y
+        config APP_CLAW_LUA_MODULE_VISION
+            bool "Vision"
+            depends on ESP_BOARD_DEV_CAMERA_SUPPORT
+            default y
+    endmenu
+
+endmenu

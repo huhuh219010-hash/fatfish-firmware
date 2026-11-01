@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#include "app_claw_hw_bridge.h"
+#include "fatfish_hw_bridge.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -45,7 +45,7 @@
 #endif
 #endif
 
-static const char *TAG = "claw_hw_bridge";
+static const char *TAG = "fatfish_hw_bridge";
 
 /* SDMMC: slot, clock, command and up to eight data pins. */
 #define RESOURCE_MAX_KEYS 11
@@ -61,7 +61,7 @@ typedef struct {
 /* Temporary batch storage; this does not limit the registry. */
 static size_t physical_catalog_size(void)
 {
-    const app_claw_hw_board_config_t *board = &app_claw_hw_generated_board;
+    const fatfish_hw_board_config_t *board = &fatfish_hw_generated_board;
     size_t capacity = GPIO_NUM_MAX + SOC_SPI_PERIPH_NUM + board->group_count;
 #if SOC_I2C_SUPPORTED
     capacity += SOC_I2C_NUM;
@@ -123,32 +123,32 @@ static esp_err_t catalog_add(bridge_catalog_t *catalog, const char *key, claw_hw
     return ESP_OK;
 }
 
-static esp_err_t catalog_add_resource(bridge_catalog_t *catalog, app_claw_hw_resource_kind_t kind, int a, int b)
+static esp_err_t catalog_add_resource(bridge_catalog_t *catalog, fatfish_hw_resource_kind_t kind, int a, int b)
 {
     char key[CLAW_HW_KEY_SIZE];
     const char *result = NULL;
     switch (kind) {
-    case APP_CLAW_HW_GPIO:
+    case FATFISH_HW_GPIO:
         if (a < 0 || a >= GPIO_NUM_MAX || !GPIO_IS_VALID_GPIO(a)) return ESP_ERR_INVALID_ARG;
         result = claw_hw_key_gpio(key, sizeof(key), a); break;
-    case APP_CLAW_HW_I2C_BUS: result = claw_hw_key_i2c_controller(key, sizeof(key), a); break;
-    case APP_CLAW_HW_I2C_ADDR: result = claw_hw_key_i2c_addr(key, sizeof(key), a, b); break;
-    case APP_CLAW_HW_I2S_BUS: result = claw_hw_key_i2s_bus(key, sizeof(key), a); break;
-    case APP_CLAW_HW_SPI_BUS: result = claw_hw_key_spi_bus(key, sizeof(key), a); break;
-    case APP_CLAW_HW_UART_BUS: result = claw_hw_key_uart_bus(key, sizeof(key), a); break;
-    case APP_CLAW_HW_ADC_UNIT: result = claw_hw_key_adc_unit(key, sizeof(key), a); break;
-    case APP_CLAW_HW_ADC_CHANNEL: result = claw_hw_key_adc_channel(key, sizeof(key), a, b); break;
-    case APP_CLAW_HW_LEDC_TIMER: result = claw_hw_key_ledc_timer(key, sizeof(key), a, b); break;
-    case APP_CLAW_HW_LEDC_CHANNEL: result = claw_hw_key_ledc_channel(key, sizeof(key), a, b); break;
-    case APP_CLAW_HW_SDMMC_SLOT: result = claw_hw_key_sdmmc_slot(key, sizeof(key), a); break;
-    case APP_CLAW_HW_DSI_BUS: result = claw_hw_key_dsi_bus(key, sizeof(key), a); break;
-    case APP_CLAW_HW_LDO_CHANNEL: result = claw_hw_key_ldo_channel(key, sizeof(key), a); break;
+    case FATFISH_HW_I2C_BUS: result = claw_hw_key_i2c_controller(key, sizeof(key), a); break;
+    case FATFISH_HW_I2C_ADDR: result = claw_hw_key_i2c_addr(key, sizeof(key), a, b); break;
+    case FATFISH_HW_I2S_BUS: result = claw_hw_key_i2s_bus(key, sizeof(key), a); break;
+    case FATFISH_HW_SPI_BUS: result = claw_hw_key_spi_bus(key, sizeof(key), a); break;
+    case FATFISH_HW_UART_BUS: result = claw_hw_key_uart_bus(key, sizeof(key), a); break;
+    case FATFISH_HW_ADC_UNIT: result = claw_hw_key_adc_unit(key, sizeof(key), a); break;
+    case FATFISH_HW_ADC_CHANNEL: result = claw_hw_key_adc_channel(key, sizeof(key), a, b); break;
+    case FATFISH_HW_LEDC_TIMER: result = claw_hw_key_ledc_timer(key, sizeof(key), a, b); break;
+    case FATFISH_HW_LEDC_CHANNEL: result = claw_hw_key_ledc_channel(key, sizeof(key), a, b); break;
+    case FATFISH_HW_SDMMC_SLOT: result = claw_hw_key_sdmmc_slot(key, sizeof(key), a); break;
+    case FATFISH_HW_DSI_BUS: result = claw_hw_key_dsi_bus(key, sizeof(key), a); break;
+    case FATFISH_HW_LDO_CHANNEL: result = claw_hw_key_ldo_channel(key, sizeof(key), a); break;
     default: return ESP_ERR_INVALID_ARG;
     }
     return catalog_add(catalog, result, CLAW_HW_EXCLUSIVE);
 }
 
-static esp_err_t catalog_add_device(bridge_catalog_t *catalog, const app_claw_hw_group_t *group)
+static esp_err_t catalog_add_device(bridge_catalog_t *catalog, const fatfish_hw_group_t *group)
 {
     if (!group->device) return ESP_OK;
     char key[CLAW_HW_KEY_SIZE];
@@ -156,23 +156,23 @@ static esp_err_t catalog_add_device(bridge_catalog_t *catalog, const app_claw_hw
 }
 
 #define ADD(kind, a, b) do { \
-    esp_err_t err = catalog_add_resource(catalog, APP_CLAW_HW_##kind, a, b); \
+    esp_err_t err = catalog_add_resource(catalog, FATFISH_HW_##kind, a, b); \
     if (err != ESP_OK) return err; \
 } while (0)
 
-static esp_err_t add_board_resource(bridge_catalog_t *catalog, const app_claw_hw_resource_t *resource)
+static esp_err_t add_board_resource(bridge_catalog_t *catalog, const fatfish_hw_resource_t *resource)
 {
     esp_err_t err = catalog_add_resource(catalog, resource->kind, resource->a, resource->b);
     if (err != ESP_OK) return err;
 #if SOC_ADC_SUPPORTED
-    if (resource->kind == APP_CLAW_HW_ADC_CHANNEL) {
+    if (resource->kind == FATFISH_HW_ADC_CHANNEL) {
         int unit = resource->a, channel = resource->b;
         if (unit < 0 || unit >= SOC_ADC_PERIPH_NUM || channel < 0 || channel >= BRIDGE_ADC_CHANNEL_COUNT(unit)) return ESP_ERR_INVALID_ARG;
         ADD(GPIO, adc_channel_io_map[unit][channel], 0);
     }
 #endif
 #if SOC_SDMMC_HOST_SUPPORTED && !SOC_SDMMC_USE_GPIO_MATRIX
-    if (resource->kind == APP_CLAW_HW_SDMMC_SLOT) {
+    if (resource->kind == FATFISH_HW_SDMMC_SLOT) {
         int slot = resource->a, width = resource->b;
         if (slot < 0 || slot >= SOC_SDMMC_NUM_SLOTS || (width != 1 && width != 4 && width != 8)) return ESP_ERR_INVALID_ARG;
         if (width > sdmmc_slot_info[slot].width) return ESP_ERR_INVALID_ARG;
@@ -215,12 +215,12 @@ static esp_err_t build_catalog(bridge_catalog_t *catalog)
         for (int channel = 0; channel < LEDC_CHANNEL_MAX; ++channel) ADD(LEDC_CHANNEL, mode, channel);
     }
 #endif
-    const app_claw_hw_board_config_t *board = &app_claw_hw_generated_board;
+    const fatfish_hw_board_config_t *board = &fatfish_hw_generated_board;
     for (size_t i = 0; i < board->group_count; ++i) {
-        const app_claw_hw_group_t *group = &board->groups[i];
+        const fatfish_hw_group_t *group = &board->groups[i];
         for (size_t j = 0; j < group->resource_count; ++j) {
             /* I2C addresses are checked when the device claims them. */
-            if (group->resources[j].kind == APP_CLAW_HW_I2C_ADDR) continue;
+            if (group->resources[j].kind == FATFISH_HW_I2C_ADDR) continue;
             esp_err_t err = add_board_resource(catalog, &group->resources[j]);
             if (err != ESP_OK) return err;
         }
@@ -244,10 +244,10 @@ typedef struct {
 /* One board manager per firmware; its bridge lives until reboot. */
 static board_bridge_t *s_bridge;
 
-esp_err_t app_claw_hw_bridge_init(claw_hw_registry_handle_t registry)
+esp_err_t fatfish_hw_bridge_init(claw_hw_registry_handle_t registry)
 {
     if (!registry || s_bridge) return ESP_ERR_INVALID_STATE;
-    board_bridge_t *bridge = calloc(1, sizeof(*bridge) + app_claw_hw_generated_board.group_count * sizeof(board_usage_t));
+    board_bridge_t *bridge = calloc(1, sizeof(*bridge) + fatfish_hw_generated_board.group_count * sizeof(board_usage_t));
     if (!bridge) return ESP_ERR_NO_MEM;
     bridge_catalog_t *catalog = catalog_create(physical_catalog_size());
     if (!catalog) { free(bridge); return ESP_ERR_NO_MEM; }
@@ -263,17 +263,17 @@ esp_err_t app_claw_hw_bridge_init(claw_hw_registry_handle_t registry)
     return ESP_OK;
 }
 
-static const app_claw_hw_group_t *find_group(const char *name, bool device)
+static const fatfish_hw_group_t *find_group(const char *name, bool device)
 {
-    const app_claw_hw_board_config_t *board = &app_claw_hw_generated_board;
+    const fatfish_hw_board_config_t *board = &fatfish_hw_generated_board;
     for (size_t i = 0; i < board->group_count; ++i) {
-        const app_claw_hw_group_t *group = &board->groups[i];
+        const fatfish_hw_group_t *group = &board->groups[i];
         if (group->device == device && strcmp(group->name, name) == 0) return group;
     }
     return NULL;
 }
 
-static esp_err_t claim_group(const app_claw_hw_group_t *group)
+static esp_err_t claim_group(const fatfish_hw_group_t *group)
 {
     board_usage_t *usage = &s_bridge->usage[group->group];
     if (usage->users) return ESP_OK;
@@ -299,10 +299,10 @@ static void release_group(board_usage_t *usage)
 }
 
 /* Called only where Board Manager creates or destroys the actual driver. */
-esp_err_t app_claw_hw_driver_init(const char *name, bool device, esp_err_t (*init)(void *, int, void **), void *config, int size, void **handle)
+esp_err_t fatfish_hw_driver_init(const char *name, bool device, esp_err_t (*init)(void *, int, void **), void *config, int size, void **handle)
 {
     if (!s_bridge) return ESP_ERR_INVALID_STATE;
-    const app_claw_hw_group_t *group = find_group(name, device);
+    const fatfish_hw_group_t *group = find_group(name, device);
     if (!group) return init(config, size, handle); /* Custom devices remain outside the standard map. */
     esp_err_t err = claim_group(group);
     if (err != ESP_OK) return err;
@@ -313,10 +313,10 @@ esp_err_t app_claw_hw_driver_init(const char *name, bool device, esp_err_t (*ini
     return err;
 }
 
-esp_err_t app_claw_hw_driver_deinit(const char *name, bool device, esp_err_t (*deinit)(void *), void *handle)
+esp_err_t fatfish_hw_driver_deinit(const char *name, bool device, esp_err_t (*deinit)(void *), void *handle)
 {
     if (!s_bridge) return ESP_ERR_INVALID_STATE;
-    const app_claw_hw_group_t *group = find_group(name, device);
+    const fatfish_hw_group_t *group = find_group(name, device);
     if (group && group->device && !group->board_owned) {
         char key[CLAW_HW_KEY_SIZE];
         const char *access = claw_hw_key_device(key, sizeof(key), group->name);

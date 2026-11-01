@@ -4,7 +4,7 @@ This is the product-owned `cap_system` implementation selected by
 `main/idf_component.yml`. It replaces the same-named ESP-Claw component for
 this firmware without modifying ESP-Claw sources.
 
-The compatibility boundary consumed by `app_claw` is:
+The compatibility boundary consumed by `fatfish_runtime` is:
 
 - `cap_system_register_group()`
 - `cap_system_time_sync_service_start()`

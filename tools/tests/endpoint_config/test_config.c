@@ -90,10 +90,8 @@ static void test_provider_roundtrip(void)
     strcpy(config.llm_backend_type, "anthropic_compatible");
     assert(app_config_save(&config) == ESP_OK);
     assert(app_config_load(&config) == ESP_OK);
-    app_claw_config_t claw;
-    app_config_to_claw(&config, &claw);
-    assert(!strcmp(claw.llm_endpoint_provider, "custom-source"));
-    assert(!strcmp(claw.llm_backend_type, "anthropic_compatible"));
+    assert(!strcmp(config.llm_endpoint_provider, "custom-source"));
+    assert(!strcmp(config.llm_backend_type, "anthropic_compatible"));
 }
 #ifdef TEST_MOSAICO
 static void test_trial(void)
@@ -113,9 +111,7 @@ static void test_trial(void)
         assert(!strcmp(config.llm_api_key, "debug-only"));
         assert(!strcmp(config.asr_api_key, "debug-only"));
         assert(!config.llm_auth_type[0]);
-        app_claw_config_t claw;
-        app_config_to_claw(&config, &claw);
-        assert(!strcmp(claw.asr_endpoint_provider, "trial"));
+        assert(!strcmp(config.asr_endpoint_provider, "trial"));
     }
     reset(); set("llm_backend", "openai_compatible"); set("llm_auth_type", "trial");
     set("asr_provider", "qwen");
@@ -131,8 +127,6 @@ int main(void)
 #ifdef TEST_MOSAICO
     test_trial();
     puts("PASS: main configuration migration, interrupted migration, debug values and provider roundtrip");
-#else
-    puts("PASS: standalone configuration migration and provider roundtrip");
 #endif
     settings_store_erase_all();
     return 0;
