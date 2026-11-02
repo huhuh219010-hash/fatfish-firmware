@@ -6,7 +6,9 @@ set(MOSAIC_APP_BUNDLE generated/holo_partner.gspb)
 set(MOSAIC_APP_SCENE_DIR scene)
 set(MOSAIC_APP_SCENE_JSON scene/holo_partner_480.json)
 set(MOSAIC_APP_GENERATOR scene/gen_scene.py)
-set(MOSAIC_APP_SCENE_SOURCES scene/holo_partner_layout.py)
+set(MOSAIC_APP_SCENE_SOURCES
+    scene/holo_partner_layout.py
+    scene/assets/fatfish_idle.png)
 set(MOSAIC_APP_GENERATED_HEADERS
     holo_partner_actions.h
     holo_partner_objects.h)

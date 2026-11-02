@@ -63,7 +63,7 @@ const mosaic_app_descriptor_t mosaic_holo_partner_app = {
     .route_count = sizeof(s_holo_partner_routes) /
                    sizeof(s_holo_partner_routes[0]),
     .name = "holo_partner",
-    .title = "HoloPartner",
+    .title = "Fatfish",
     .directory = &gsp_obj_directory_holo_partner,
     .disable_swipe = true,
     /* This first milestone owns its complete canvas, including Back. */

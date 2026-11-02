@@ -22,6 +22,7 @@
 #include <time.h>
 
 #if defined(ESP_PLATFORM)
+#include "esp_random.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 #include "mosaic_loader.h"
@@ -43,6 +44,9 @@
 #define MOSAIC_INSERT_APP_NAME_MAX    32U
 #define MOSAIC_QUICK_TAP_SLOP          12
 #define MOSAIC_QUICK_FEEDBACK_MS      2000U
+#define MOSAIC_FATFISH_LOOK_MS        10200U
+#define MOSAIC_FATFISH_IDLE_MIN_MS    60000U
+#define MOSAIC_FATFISH_IDLE_JITTER_MS 60000U
 
 static const char *TAG = "mosaic_hub";
 
@@ -68,6 +72,8 @@ static esp_gsp_handle_t s_hub_ui;
 static void* s_clock_timer;
 static void* s_battery_timer;
 static void* s_aod_hint_timer;
+static void* s_fatfish_idle_timer;
+static bool s_fatfish_looking;
 static void* s_lock_poll_timer;
 static bool s_aod_hint_dim;
 static bool s_pointer_down;
@@ -133,6 +139,81 @@ static bool mosaic_hub_lock_visible(void);
 static bool mosaic_hub_quick_drawer_open(esp_gsp_handle_t ui);
 
 static void mosaic_hub_insert_schedule(uint32_t delay_ms);
+
+static uint32_t mosaic_hub_fatfish_idle_delay(void)
+{
+#if defined(ESP_PLATFORM)
+    const uint32_t random_value = esp_random();
+#else
+    const uint32_t random_value = (uint32_t)rand();
+#endif
+    return MOSAIC_FATFISH_IDLE_MIN_MS +
+           random_value % (MOSAIC_FATFISH_IDLE_JITTER_MS + 1U);
+}
+
+static void mosaic_hub_fatfish_schedule(esp_gsp_handle_t ui,
+                                        uint32_t delay_ms);
+
+static void mosaic_hub_fatfish_timer_cb(esp_gsp_handle_t ui, void *user_ctx)
+{
+    (void)user_ctx;
+    void *timer = s_fatfish_idle_timer;
+    s_fatfish_idle_timer = NULL;
+    if (timer != NULL) {
+        (void)esp_gsp_timer_delete(ui, timer);
+    }
+
+    if (s_fatfish_looking) {
+        (void)esp_gsp_component_set_visible(
+            ui, GSP_OBJ_KEY_FATFISH_IDLE_LOOK_AROUND, false);
+        (void)esp_gsp_component_set_visible(
+            ui, GSP_OBJ_KEY_FATFISH_IDLE_BREATHING, true);
+        s_fatfish_looking = false;
+        mosaic_hub_fatfish_schedule(ui, mosaic_hub_fatfish_idle_delay());
+        return;
+    }
+
+    /* A hidden authored animation restarts from frame zero when shown. Keep
+     * breathing hidden until the complete look-around cycle has elapsed. */
+    (void)esp_gsp_component_set_visible(
+        ui, GSP_OBJ_KEY_FATFISH_IDLE_BREATHING, false);
+    (void)esp_gsp_component_set_visible(
+        ui, GSP_OBJ_KEY_FATFISH_IDLE_LOOK_AROUND, true);
+    s_fatfish_looking = true;
+    mosaic_hub_fatfish_schedule(ui, MOSAIC_FATFISH_LOOK_MS);
+}
+
+static void mosaic_hub_fatfish_schedule(esp_gsp_handle_t ui,
+                                        uint32_t delay_ms)
+{
+    if (s_fatfish_idle_timer != NULL) {
+        (void)esp_gsp_timer_delete(ui, s_fatfish_idle_timer);
+    }
+    s_fatfish_idle_timer = esp_gsp_timer_create(
+        ui, delay_ms, mosaic_hub_fatfish_timer_cb, NULL);
+    if (s_fatfish_idle_timer == NULL) {
+        ESP_LOGE(TAG, "Create Fatfish idle timer failed");
+    }
+}
+
+static void mosaic_hub_fatfish_start(esp_gsp_handle_t ui)
+{
+    s_fatfish_looking = false;
+    (void)esp_gsp_component_set_visible(
+        ui, GSP_OBJ_KEY_FATFISH_IDLE_LOOK_AROUND, false);
+    (void)esp_gsp_component_set_visible(
+        ui, GSP_OBJ_KEY_FATFISH_IDLE_BREATHING, true);
+    mosaic_hub_fatfish_schedule(ui, mosaic_hub_fatfish_idle_delay());
+}
+
+static void mosaic_hub_fatfish_stop(esp_gsp_handle_t ui)
+{
+    if (s_fatfish_idle_timer != NULL) {
+        (void)esp_gsp_timer_delete(ui, s_fatfish_idle_timer);
+        s_fatfish_idle_timer = NULL;
+    }
+    s_fatfish_looking = false;
+}
 
 static void mosaic_hub_quick_feedback_timer_cb(
     esp_gsp_handle_t ui, void *user_ctx)
@@ -1320,6 +1401,7 @@ static void mosaic_hub_start_timers(esp_gsp_handle_t ui)
 
 static void mosaic_hub_stop_timers(esp_gsp_handle_t ui)
 {
+    mosaic_hub_fatfish_stop(ui);
     if (s_lock_poll_timer != NULL) {
         (void)esp_gsp_timer_delete(ui, s_lock_poll_timer);
         s_lock_poll_timer = NULL;
@@ -1428,6 +1510,7 @@ static void mosaic_hub_started(esp_gsp_handle_t ui)
     (void)esp_gsp_set_input_interceptor(
         ui, mosaic_hub_intercept_pointer, NULL);
     mosaic_hub_start_timers(ui);
+    mosaic_hub_fatfish_start(ui);
 }
 
 static void mosaic_hub_stopping(esp_gsp_handle_t ui)

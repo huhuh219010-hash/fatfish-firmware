@@ -509,6 +509,12 @@ static void main_fatfish_runtime_event(
     case FATFISH_RUNTIME_EVENT_STOPPED:
         ESP_LOGI(TAG, "Fatfish runtime stopped");
         break;
+    case FATFISH_RUNTIME_EVENT_STATE_CHANGED:
+        ESP_LOGI(TAG, "Fatfish state: %s -> %s (transition=%lu)",
+                 fatfish_state_name(event->data.state.previous),
+                 fatfish_state_name(event->data.state.current),
+                 (unsigned long)event->data.state.transition_count);
+        break;
     default:
         break;
     }

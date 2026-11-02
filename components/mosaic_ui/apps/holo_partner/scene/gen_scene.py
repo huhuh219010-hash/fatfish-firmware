@@ -40,7 +40,8 @@ def main() -> None:
                       name="holo_partner_root"))
     append_holo_partner_content(
         objs, page, bold_font=BOLD, show_back=True,
-        probe_callback="holo_probe")
+        probe_callback="holo_probe",
+        idle_asset="assets/fatfish_idle.png", animated=False)
 
     write_scene(scene_out_path(HERE, "holo_partner_480.json"),
                 "holo_partner", objs, font=FONT)

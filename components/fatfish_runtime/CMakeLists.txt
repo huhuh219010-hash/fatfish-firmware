@@ -40,6 +40,7 @@ endif()
 idf_component_register(
     SRCS
         "fatfish_runtime.c"
+        "fatfish_state_machine.c"
         "fatfish_runtime_lua.c"
         "fatfish_lua_modules.c"
         "fatfish_paths.c"
@@ -55,6 +56,7 @@ idf_component_register(
         cap_system
         claw_cap
         claw_hw_registry
+        esp_timer
         mosaico_camera_service
     PRIV_REQUIRES
         driver

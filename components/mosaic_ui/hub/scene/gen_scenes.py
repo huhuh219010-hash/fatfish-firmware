@@ -792,7 +792,12 @@ def build_hub_objects():
     build_clock_face(objs, legacy_home)
     append_holo_partner_content(
         objs, home_main, bold_font=BOLD, show_back=False,
-        probe_callback='home_holo_probe')
+        probe_callback='home_holo_probe',
+        idle_asset=(
+            '../../apps/holo_partner/scene/assets/fatfish_idle_breathing.apng'),
+        look_around_asset=(
+            '../../apps/holo_partner/scene/assets/fatfish_idle_look_around.apng'),
+        animated=True)
 
     # tab1: Apps1 — icon grid only (no bottom dots / Home chrome).
     apps1_main = len(objs)
@@ -804,8 +809,8 @@ def build_hub_objects():
     objs.append(layer(flow, CONTENT_W * 2, 0, CONTENT_W, CONTENT_H,
                       name='launcher_flow_tab2'))
     place_app_grid(objs, apps2_main, (
-        {'name': 'app_holo_partner', 'text': 'HoloPartner',
-         'callback': 'app_holo_partner', 'button_text': 'HP',
+        {'name': 'app_holo_partner', 'text': 'Fatfish',
+         'callback': 'app_holo_partner', 'button_text': 'FF',
          'bg': '#123F50'},
         {'name': 'app_interact', 'icon': 'controller', 'text': 'Interaction',
          'callback': 'app_interact'},

@@ -37,4 +37,9 @@ main/                    Application entry point and runtime service wiring
 third-party/esp-claw/    ESP-Claw Git submodule
 tools/                   Build helpers and CMake utilities
 ```
+
+## Design Documents
+
+- [Fatfish animation, speech, and Agent architecture constraints](docs/fatfish-interaction-architecture.md)
+
 # fatfish-firmware

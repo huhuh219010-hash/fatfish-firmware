@@ -12,6 +12,7 @@
 
 #include "esp_err.h"
 #include "claw_hw_registry.h"
+#include "fatfish_state_machine.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,6 +43,7 @@ typedef enum {
     FATFISH_RUNTIME_EVENT_CAMERA_PROBED,
     FATFISH_RUNTIME_EVENT_COMMAND_FAILED,
     FATFISH_RUNTIME_EVENT_STOPPED,
+    FATFISH_RUNTIME_EVENT_STATE_CHANGED,
 } fatfish_runtime_event_type_t;
 
 typedef struct {
@@ -59,6 +61,7 @@ typedef struct {
     esp_err_t status;
     union {
         fatfish_runtime_camera_info_t camera;
+        fatfish_state_snapshot_t state;
     } data;
 } fatfish_runtime_event_t;
 
@@ -127,6 +130,9 @@ esp_err_t fatfish_runtime_unsubscribe(
     fatfish_runtime_event_callback_t event_callback, void *user_ctx);
 
 bool fatfish_runtime_is_initialized(void);
+
+/** @brief Copy the current behavior state without exposing runtime locking. */
+esp_err_t fatfish_runtime_get_state(fatfish_state_snapshot_t *snapshot);
 
 /** @brief Return capability groups retained by the product runtime. */
 esp_err_t fatfish_runtime_get_compiled_capabilities(

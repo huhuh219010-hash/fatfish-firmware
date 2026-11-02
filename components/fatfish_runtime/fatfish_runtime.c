@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -37,6 +38,7 @@ typedef struct {
     fatfish_runtime_event_callback_t event_callback;
     void *user_ctx;
     fatfish_runtime_subscriber_t subscribers[FATFISH_RUNTIME_MAX_SUBSCRIBERS];
+    fatfish_state_machine_t state_machine;
     bool initialized;
     bool accepting_commands;
 } fatfish_runtime_state_t;
@@ -78,6 +80,34 @@ static void emit_event(const fatfish_runtime_event_t *event)
         if (subscribers[i].callback) {
             subscribers[i].callback(event, subscribers[i].user_ctx);
         }
+    }
+}
+
+static uint64_t runtime_now_ms(void)
+{
+    return (uint64_t)esp_timer_get_time() / UINT64_C(1000);
+}
+
+static void runtime_set_running(bool running)
+{
+    fatfish_state_snapshot_t snapshot = {0};
+    bool changed;
+
+    xSemaphoreTake(s_runtime.lock, portMAX_DELAY);
+    changed = running
+                  ? fatfish_state_machine_start(&s_runtime.state_machine,
+                                                runtime_now_ms())
+                  : fatfish_state_machine_stop(&s_runtime.state_machine,
+                                               runtime_now_ms());
+    fatfish_state_machine_snapshot(&s_runtime.state_machine, &snapshot);
+    xSemaphoreGive(s_runtime.lock);
+
+    if (changed) {
+        emit_event(&(fatfish_runtime_event_t) {
+            .type = FATFISH_RUNTIME_EVENT_STATE_CHANGED,
+            .status = ESP_OK,
+            .data.state = snapshot,
+        });
     }
 }
 
@@ -139,6 +169,7 @@ static void runtime_worker(void *arg)
         .type = FATFISH_RUNTIME_EVENT_READY,
         .status = ESP_OK,
     });
+    runtime_set_running(true);
 
     fatfish_runtime_message_t message;
     while (xQueueReceive(s_runtime.queue, &message, portMAX_DELAY) == pdTRUE) {
@@ -148,6 +179,7 @@ static void runtime_worker(void *arg)
         process_command(&message.command);
     }
 
+    runtime_set_running(false);
     emit_event(&(fatfish_runtime_event_t) {
         .type = FATFISH_RUNTIME_EVENT_STOPPED,
         .status = ESP_OK,
@@ -204,6 +236,7 @@ esp_err_t fatfish_runtime_init(const fatfish_runtime_config_t *config)
     s_runtime.event_callback = resolved.event_callback;
     s_runtime.user_ctx = resolved.user_ctx;
     memset(s_runtime.subscribers, 0, sizeof(s_runtime.subscribers));
+    fatfish_state_machine_init(&s_runtime.state_machine);
     s_runtime.accepting_commands = true;
     s_runtime.initialized = true;
     BaseType_t created = xTaskCreate(runtime_worker, "fatfish_runtime",
@@ -366,4 +399,23 @@ bool fatfish_runtime_is_initialized(void)
     const bool initialized = s_runtime.initialized;
     xSemaphoreGive(s_runtime.lock);
     return initialized;
+}
+
+esp_err_t fatfish_runtime_get_state(fatfish_state_snapshot_t *snapshot)
+{
+    if (!snapshot) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    if (!s_runtime.lock) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    xSemaphoreTake(s_runtime.lock, portMAX_DELAY);
+    if (!s_runtime.initialized) {
+        xSemaphoreGive(s_runtime.lock);
+        return ESP_ERR_INVALID_STATE;
+    }
+    fatfish_state_machine_snapshot(&s_runtime.state_machine, snapshot);
+    xSemaphoreGive(s_runtime.lock);
+    return ESP_OK;
 }
